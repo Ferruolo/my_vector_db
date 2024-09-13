@@ -17,7 +17,7 @@ trait VectorItem {
 trait VectorDB  {
     fn add_item(&self, text_item: &String);
 
-    fn find_k_neighbors(&self, text_item: &String, k: u8);
+    fn find_k_neighbors(&self, text_item: &String, k: u8) -> Vec<String>;
 }
 
 
@@ -107,8 +107,10 @@ impl VectorDB for VectorDBCore {
         for i in 0..self.data.len() {
             scores.push((i, self.data[i].compare(&query_item)));
         }
-        scores.sort_by(|a, b| {b[1].cmp(a[1])})
-        &scores[0..k]
+        scores.sort_by(|a, b| {b[1].cmp(a[1])});
+
+        let text_pieces = scores[0..k].map(|x|{self.data[x].text_data});
+        text_pieces
     }
 }
 
