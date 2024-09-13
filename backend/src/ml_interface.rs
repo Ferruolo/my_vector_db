@@ -10,26 +10,36 @@ pub trait TokenizerInterface {
 
 // Struct wrapper for the LLaMA tokenizer
 pub struct LlamaTokenizer {
-    tokenizer: Tokenizer,
+    tokenizer: Box<Tokenizer>,
 }
 
 impl LlamaTokenizer {
-    pub(crate) fn new(model_path: &str) -> Result<Self> {
-        let tokenizer = Tokenizer::from_file(model_path)?;
-        Ok(LlamaTokenizer { tokenizer })
+    pub(crate) fn new(model_path: &str) -> Self {
+        let tokenizer = match Tokenizer::from_file(model_path) {
+            Ok(x) => {Box::new(x)}
+            Err(err) => {panic!("Error loading Tokenizer: {}", err)}
+        };
+
+        LlamaTokenizer { tokenizer }
     }
 }
 
 // Implement the TokenizerInterface trait for LlamaTokenizer
 impl TokenizerInterface for LlamaTokenizer {
     fn tokenize(&self, text: &str) -> Result<Vec<String>> {
-        let encoding = self.tokenizer.encode(text, false)?;
+        let encoding = match self.tokenizer.encode(text, false) {
+            Ok(x) => {Box::new(x)}
+            Err(err) => {panic!("{}", err)}
+        };
         Ok(encoding.get_tokens().to_vec())
     }
 
     fn encode(&self, text: &str) -> Result<Vec<u32>> {
-        let encoding = self.tokenizer.encode(text, false)?;
-        Ok(encoding.get_ids().to_vec())
+        let encoding = match self.tokenizer.encode(text, false) {
+            Ok(x) => {Box::new(x)}
+            Err(err) => {panic!("{}", err)}
+        };
+        Ok((*encoding.get_ids().to_vec()).to_owned())
     }
 }
 

@@ -1,46 +1,31 @@
-
-// Interfaces
-// This will make it easier to abstract as we
-// Switch to more low level types
-
-
 use tch::{Device, Kind, Tensor};
-
 use crate::ml_interface::{Embedding, LlamaTokenizer, TokenizerInterface};
 
 trait VectorItem {
-    fn from_text(text_data: &String, embedding: &Embedding, llama_tokenizer: &LlamaTokenizer) -> Self;
-
+    fn from_text(text_data: &str, embedding: &Embedding, llama_tokenizer: &LlamaTokenizer) -> Self;
     fn compare(&self, other: &Self) -> f32;
 }
 
-trait VectorDB  {
-    fn add_item(&self, text_item: &String);
-
-    fn find_k_neighbors(&self, text_item: &String, k: u8) -> Vec<String>;
+fn compare_f32(a: f32, b: f32) -> std::cmp::Ordering {
+    a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal)
 }
 
-
-
 struct DbItem {
-    text_data: String, // TODO: make it a str?
+    text_data: String,
     vector_data: Tensor
 }
 
-
 impl DbItem {
     fn new() -> DbItem {
-        let vector_data = [0f32, 0f32, 0f32, 0f32, 0f32];
         Self {
-            text_data: "".to_string(),
-            vector_data: Box::new(*vector_data),
+            text_data: String::new(),
+            vector_data: Tensor::zeros(&[4096], (Kind::Float, Device::Cpu)),
         }
     }
 }
 
 impl VectorItem for DbItem {
-
-    fn from_text(text_data: &String, embedding: &Embedding, llama_tokenizer: &LlamaTokenizer) -> Self {
+    fn from_text(text_data: &str, embedding: &Embedding, llama_tokenizer: &LlamaTokenizer) -> Self {
         let tokens = llama_tokenizer.encode(text_data).unwrap();
         let token_count = tokens.len() as f64;
         let sum_token = tokens.iter().fold(
@@ -49,7 +34,7 @@ impl VectorItem for DbItem {
         );
         let average_token = sum_token / token_count;
         Self {
-            text_data: text_data.clone(),
+            text_data: text_data.to_string(),
             vector_data: average_token
         }
     }
@@ -58,62 +43,40 @@ impl VectorItem for DbItem {
         let dot_product = self.vector_data.dot(&other.vector_data);
         let norm_a = self.vector_data.norm();
         let norm_b = other.vector_data.norm();
-        f32::try_from(dot_product / (norm_a * norm_b)).unwrap()
+        (dot_product / (norm_a * norm_b)).try_into().unwrap()
     }
 }
 
-
-struct VectorDBCore {
+pub struct VectorDBCore {
     data: Vec<DbItem>,
     tokenizer: LlamaTokenizer,
     embedding: Embedding
 }
 
-
-
-
 impl VectorDBCore {
-    fn new(tokenizer_filepath: &String, embedding_filepath: &String) -> VectorDBCore {
-        Self {
-            data: vec![],
-            tokenizer: match LlamaTokenizer::new(tokenizer_filepath)
-            {
-                Ok(x) => {x}
-                Err(_) => {
-                    panic!("Error Loading Llama Tokenizer from file")
-                }
-            },
-            embedding: Embedding::load(embedding_filepath).unwrap(),
-        }
+    pub fn new(tokenizer_filepath: &str, embedding_filepath: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        Ok(Self {
+            data: Vec::new(),
+            tokenizer: LlamaTokenizer::new(tokenizer_filepath),
+            embedding: Embedding::load(embedding_filepath)?,
+        })
     }
-}
 
-
-impl VectorDB for VectorDBCore {
-    fn add_item(&mut self, text_item: &String) {
-        let tokenized_item = match self.tokenizer.encode(text_item) {
-            Ok(x) => {x}
-            Err(_) => {
-                panic!("Issue tokenizing item {}", text_item);
-            }
-        };
+    pub fn add_item(&mut self, text_item: &str) {
         self.data.push(DbItem::from_text(text_item, &self.embedding, &self.tokenizer));
     }
 
-    fn find_k_neighbors(&self, text_item: &String, k: u8) {
+    pub fn find_k_neighbors(&self, text_item: &str, k: usize) -> Vec<String> {
         let query_item = DbItem::from_text(text_item, &self.embedding, &self.tokenizer);
-        let mut scores: Vec<(usize, f32)> = vec![];
-        scores.reserve(self.data.len());
-        for i in 0..self.data.len() {
-            scores.push((i, self.data[i].compare(&query_item)));
-        }
-        scores.sort_by(|a, b| {b[1].cmp(a[1])});
+        let mut scores: Vec<(usize, f32)> = self.data.iter().enumerate()
+            .map(|(i, item)| (i, item.compare(&query_item)))
+            .collect();
 
-        let text_pieces = scores[0..k].map(|x|{self.data[x].text_data});
-        text_pieces
+        scores.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        scores.into_iter()
+            .take(k)
+            .map(|(i, _)| self.data[i].text_data.clone())
+            .collect()
     }
 }
-
-
-
-
