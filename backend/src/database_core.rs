@@ -57,7 +57,7 @@ impl VectorDBCore {
     pub fn new(tokenizer_filepath: &str, embedding_filepath: &str) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
             data: Vec::new(),
-            tokenizer: LlamaTokenizer::new(tokenizer_filepath),
+            tokenizer: LlamaTokenizer::new(tokenizer_filepath)?,
             embedding: Embedding::load(embedding_filepath)?,
         })
     }

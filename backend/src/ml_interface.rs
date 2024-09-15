@@ -1,48 +1,73 @@
-use tokenizers::tokenizer::{Tokenizer};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
 use anyhow::{Result, Context};
-use tch::{Tensor};
+use serde_json::Value;
+use tch::Tensor;
+use tiktoken_rs::CoreBPE;
+use rustc_hash::FxHashMap;
+
 
 // Define a trait for tokenizer operations
 pub trait TokenizerInterface {
-    fn tokenize(&self, text: &str) -> Result<Vec<String>>;
-    fn encode(&self, text: &str) -> Result<Vec<u32>>;
+    fn encode(&self, text: &str) -> Result<Vec<usize>>;
 }
 
 // Struct wrapper for the LLaMA tokenizer
 pub struct LlamaTokenizer {
-    tokenizer: Box<Tokenizer>,
+    tokenizer: CoreBPE,
 }
 
 impl LlamaTokenizer {
-    pub(crate) fn new(model_path: &str) -> Self {
-        let tokenizer = match Tokenizer::from_file(model_path) {
-            Ok(x) => {Box::new(x)}
-            Err(err) => {panic!("Error loading Tokenizer: {}", err)}
-        };
+    pub(crate) fn new(vocab_file: &str) -> Result<Self> {
+        let mut file = File::open(vocab_file)
+            .with_context(|| format!("Failed to open vocab file: {}", vocab_file))?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)
+            .with_context(|| format!("Failed to read vocab file: {}", vocab_file))?;
 
-        LlamaTokenizer { tokenizer }
+        let json: Value = serde_json::from_str(&contents)
+            .with_context(|| format!("Failed to parse JSON from vocab file: {}", vocab_file))?;
+
+        let encoder: FxHashMap<Vec<u8>, usize> = json["model"]["vocab"]
+            .as_object()
+            .context("Failed to get vocab object")?
+            .iter()
+            .map(|(k, v)| (k.as_bytes().to_vec(), v.as_u64().unwrap() as usize))
+            .collect();
+
+        let special_tokens: FxHashMap<Vec<u8>, usize> = json["model"]["special_tokens"]
+            .as_object()
+            .context("Failed to get special tokens object")?
+            .iter()
+            .map(|(k, v)| (k.as_bytes().to_vec(), v.as_u64().unwrap() as usize))
+            .collect();
+
+        let merges: Vec<(Vec<u8>, Vec<u8>)> = json["model"]["merges"]
+            .as_array()
+            .context("Failed to get merges array")?
+            .iter()
+            .map(|v| {
+                let parts: Vec<&str> = v.as_str().unwrap().split_whitespace().collect();
+                (parts[0].as_bytes().to_vec(), parts[1].as_bytes().to_vec())
+            })
+            .collect();
+
+        let tokenizer = CoreBPE::new(encoder, special_tokens, merges)
+            .context("Failed to create CoreBPE tokenizer")?;
+
+        Ok(LlamaTokenizer { tokenizer })
+
     }
 }
+
 
 // Implement the TokenizerInterface trait for LlamaTokenizer
 impl TokenizerInterface for LlamaTokenizer {
-    fn tokenize(&self, text: &str) -> Result<Vec<String>> {
-        let encoding = match self.tokenizer.encode(text, false) {
-            Ok(x) => {Box::new(x)}
-            Err(err) => {panic!("{}", err)}
-        };
-        Ok(encoding.get_tokens().to_vec())
-    }
-
-    fn encode(&self, text: &str) -> Result<Vec<u32>> {
-        let encoding = match self.tokenizer.encode(text, false) {
-            Ok(x) => {Box::new(x)}
-            Err(err) => {panic!("{}", err)}
-        };
-        Ok((*encoding.get_ids().to_vec()).to_owned())
+    fn encode(&self, text: &str) -> Result<Vec<usize>> {
+        Ok(self.tokenizer.encode_ordinary(text))
     }
 }
-
 
 pub struct Embedding {
     weights: Tensor,

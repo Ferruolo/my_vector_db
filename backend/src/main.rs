@@ -4,8 +4,8 @@ use crate::database_core::VectorDBCore;
 mod database_core;
 mod ml_interface;
 
-const TOKENIZER_PATH: &str = "Meta-Llama-3.1-8B/tokenizer.model";
-const EMBEDDING_PATH: &str = "embedding.pth";
+const TOKENIZER_PATH: &str = "./Meta-Llama-3.1-8B/tokenizer.model";
+const EMBEDDING_PATH: &str = "./embedding.pth";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut vector_db = VectorDBCore::new(TOKENIZER_PATH, EMBEDDING_PATH)?;
