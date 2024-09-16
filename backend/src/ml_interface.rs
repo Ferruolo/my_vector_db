@@ -1,16 +1,11 @@
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::Read;
-use anyhow::{Result, Context};
-use serde_json::Value;
-use tch::Tensor;
-use tiktoken_rs::CoreBPE;
-use rustc_hash::FxHashMap;
-
+use anyhow::{Context, Result};
+use tch::{jit, Tensor};
+use tiktoken_rs::{p50k_base, CoreBPE};
+use crate::EMBEDDING_PATH;
 
 // Define a trait for tokenizer operations
 pub trait TokenizerInterface {
-    fn encode(&self, text: &str) -> Result<Vec<usize>>;
+    fn encode(&self, text: &str) -> Vec<usize>;
 }
 
 // Struct wrapper for the LLaMA tokenizer
@@ -19,53 +14,20 @@ pub struct LlamaTokenizer {
 }
 
 impl LlamaTokenizer {
-    pub(crate) fn new(vocab_file: &str) -> Result<Self> {
-        let mut file = File::open(vocab_file)
-            .with_context(|| format!("Failed to open vocab file: {}", vocab_file))?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)
-            .with_context(|| format!("Failed to read vocab file: {}", vocab_file))?;
-
-        let json: Value = serde_json::from_str(&contents)
-            .with_context(|| format!("Failed to parse JSON from vocab file: {}", vocab_file))?;
-
-        let encoder: FxHashMap<Vec<u8>, usize> = json["model"]["vocab"]
-            .as_object()
-            .context("Failed to get vocab object")?
-            .iter()
-            .map(|(k, v)| (k.as_bytes().to_vec(), v.as_u64().unwrap() as usize))
-            .collect();
-
-        let special_tokens: FxHashMap<Vec<u8>, usize> = json["model"]["special_tokens"]
-            .as_object()
-            .context("Failed to get special tokens object")?
-            .iter()
-            .map(|(k, v)| (k.as_bytes().to_vec(), v.as_u64().unwrap() as usize))
-            .collect();
-
-        let merges: Vec<(Vec<u8>, Vec<u8>)> = json["model"]["merges"]
-            .as_array()
-            .context("Failed to get merges array")?
-            .iter()
-            .map(|v| {
-                let parts: Vec<&str> = v.as_str().unwrap().split_whitespace().collect();
-                (parts[0].as_bytes().to_vec(), parts[1].as_bytes().to_vec())
-            })
-            .collect();
-
-        let tokenizer = CoreBPE::new(encoder, special_tokens, merges)
-            .context("Failed to create CoreBPE tokenizer")?;
-
-        Ok(LlamaTokenizer { tokenizer })
-
+    pub(crate) fn new() -> Self {
+        let tokenizer  = match p50k_base() {
+            Ok(x) => {x}
+            Err(err) => {panic!("Error: {}", err)}
+        };
+        Self { tokenizer }
     }
 }
 
 
 // Implement the TokenizerInterface trait for LlamaTokenizer
 impl TokenizerInterface for LlamaTokenizer {
-    fn encode(&self, text: &str) -> Result<Vec<usize>> {
-        Ok(self.tokenizer.encode_ordinary(text))
+    fn encode(&self, text: &str) -> Vec<usize> {
+        self.tokenizer.encode_with_special_tokens(text)
     }
 }
 
@@ -77,9 +39,17 @@ pub struct Embedding {
 
 impl Embedding {
     pub fn load(path: &str) -> Result<Self> {
-        let weights = Tensor::load(path)
-            .with_context(|| format!("Failed to load weights from {}", path))?;
-
+        let model =jit::CModule::load(path).with_context(|| "Failed to load model")?;
+        let weights: Tensor = match model.named_parameters() {
+            Ok(params) => {
+                params
+                    .iter()
+                    .find(|(name, _)| name == "lay_1.weight")
+                    .map(|(_, tensor)| tensor.detach())
+                    .unwrap_or_else(|| panic!("Weight 'lay_1.weight' not found"))
+            }
+            Err(err) => panic!("Error: {}", err),
+        };
         let shape = weights.size();
         if shape.len() != 2 {
             anyhow::bail!("Expected 2D weight tensor, got {:?}D", shape.len());
@@ -88,15 +58,16 @@ impl Embedding {
         let input_dim = shape[0];
         let output_dim = shape[1];
 
+        println!("Dimensions: ({}, {})", input_dim, output_dim);
         Ok(Self { weights, input_dim, output_dim })
     }
 
     pub fn forward(&self, input_index: i64) -> Result<Tensor> {
-        if input_index < 0 || input_index >= self.input_dim {
+        if input_index < 0 || input_index >= self.output_dim {
             anyhow::bail!("Invalid input index: {}. Expected 0 <= index < {}", input_index, self.input_dim);
         }
 
-        let output = self.weights.select(0, input_index);
+        let output = self.weights.select(1, input_index);
         Ok(output)
     }
 

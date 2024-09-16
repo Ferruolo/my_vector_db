@@ -4,11 +4,10 @@ use crate::database_core::VectorDBCore;
 mod database_core;
 mod ml_interface;
 
-const TOKENIZER_PATH: &str = "./Meta-Llama-3.1-8B/tokenizer.model";
-const EMBEDDING_PATH: &str = "./embedding.pth";
+const EMBEDDING_PATH: &str = "./embedding.pt";
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut vector_db = VectorDBCore::new(TOKENIZER_PATH, EMBEDDING_PATH)?;
+    let mut vector_db = VectorDBCore::new(EMBEDDING_PATH)?;
 
     // Add sentences to the database
     let sentences = [

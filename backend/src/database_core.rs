@@ -1,4 +1,4 @@
-use tch::{Device, Kind, Tensor};
+use tch::{Device, Kind, Scalar, Tensor};
 use crate::ml_interface::{Embedding, LlamaTokenizer, TokenizerInterface};
 
 trait VectorItem {
@@ -26,7 +26,7 @@ impl DbItem {
 
 impl VectorItem for DbItem {
     fn from_text(text_data: &str, embedding: &Embedding, llama_tokenizer: &LlamaTokenizer) -> Self {
-        let tokens = llama_tokenizer.encode(text_data).unwrap();
+        let tokens = llama_tokenizer.encode(text_data);
         let token_count = tokens.len() as f64;
         let sum_token = tokens.iter().fold(
             Tensor::zeros(&[4096], (Kind::Float, Device::Cpu)),
@@ -54,10 +54,10 @@ pub struct VectorDBCore {
 }
 
 impl VectorDBCore {
-    pub fn new(tokenizer_filepath: &str, embedding_filepath: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(embedding_filepath: &str) -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
             data: Vec::new(),
-            tokenizer: LlamaTokenizer::new(tokenizer_filepath)?,
+            tokenizer: LlamaTokenizer::new(),
             embedding: Embedding::load(embedding_filepath)?,
         })
     }
