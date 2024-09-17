@@ -64,8 +64,9 @@ impl VectorDBCore {
         })
     }
 
-    pub fn add_item(&mut self, text_item: &str) {
+    pub fn add_item(&mut self, text_item: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.data.push(DbItem::from_text(text_item, &self.embedding, &self.tokenizer));
+        Ok(())
     }
 
     pub fn find_k_neighbors(&self, text_item: &str, k: usize) -> Vec<String> {

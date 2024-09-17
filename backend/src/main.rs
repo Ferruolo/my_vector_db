@@ -1,4 +1,13 @@
 use std::error::Error;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use axum::{
+    routing::post,
+    Router,
+    Json,
+    extract::State,
+};
+use serde::{Deserialize, Serialize};
 use crate::database_core::VectorDBCore;
 
 mod database_core;
@@ -6,49 +15,78 @@ mod ml_interface;
 
 const EMBEDDING_PATH: &str = "./embedding.pt";
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let mut vector_db = VectorDBCore::new(EMBEDDING_PATH)?;
+#[derive(Clone)]
+struct AppState {
+    vector_db: Arc<Mutex<VectorDBCore>>,
+}
 
-    // Add sentences to the database
-    let sentences = [
-        "The sun set behind the mountains, painting the sky in vibrant hues.",
-        "She carefully planted the seeds in her garden, hoping for a bountiful harvest.",
-        "The old car sputtered to a stop on the side of the deserted highway.",
-        "Children laughed and played in the park on a warm summer afternoon.",
-        "The chef prepared a gourmet meal using locally sourced ingredients.",
-        "Astronauts conducted experiments in the weightlessness of space.",
-        "The university library was filled with students preparing for final exams.",
-        "A flock of geese flew overhead in a perfect V formation.",
-        "The detective examined the crime scene for any overlooked clues.",
-        "The artist's latest sculpture was unveiled at the museum's grand opening.",
-        "Hikers trekked through dense forests to reach the mountain summit.",
-        "The startup company celebrated securing its first round of funding.",
-        "Waves crashed against the rocky shore, spraying mist into the air.",
-        "The violinist's fingers danced across the strings during the solo performance.",
-        "Scientists discovered a new species of deep-sea creature in the Mariana Trench.",
-        "The ancient ruins stood as a testament to a long-lost civilization.",
-        "Firefighters battled the blaze that threatened to engulf the entire block.",
-        "The comedian's jokes had the audience roaring with laughter.",
-        "Athletes from around the world gathered for the opening ceremony of the Olympics.",
-        "The aroma of freshly baked bread wafted through the small bakery.",
-        "Researchers conducted experiments in space to study the effects of weightlessness on plant growth."
-    ];
+#[derive(Deserialize)]
+struct AddItemRequest {
+    item: String,
+}
 
-    for sentence in &sentences {
-        vector_db.add_item(sentence);
-    }
+#[derive(Deserialize)]
+struct RemoveItemRequest {
+    item: String,
+}
 
-    // Query sentence
-    let query = "Researchers conducted experiments in space to study the effects of weightlessness on plant growth.";
+#[derive(Deserialize)]
+struct FindTopKRequest {
+    query: String,
+    k: usize,
+}
 
-    // Perform k-nearest neighbors search
-    let k = 5;
-    let results = vector_db.find_k_neighbors(query, k);
+#[derive(Serialize)]
+struct TopKResponse {
+    results: Vec<String>,
+}
 
-    println!("Top {} results for query: \"{}\"", k, query);
-    for (i, result) in results.iter().enumerate() {
-        println!("{}. {}", i + 1, result);
-    }
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let vector_db = Arc::new(Mutex::new(VectorDBCore::new(EMBEDDING_PATH)?));
+    let app_state = AppState { vector_db };
+
+    let app = Router::new()
+        .route("/add_item", post(add_item))
+        // .route("/remove_item", post(remove_item))
+        .route("/find_top_k_query", post(find_top_k_query))
+        .with_state(app_state);
+
+    println!("Server running on http://localhost:8080");
+    axum::Server::bind(&"0.0.0.0:8080".parse()?)
+        .serve(app.into_make_service())
+        .await?;
 
     Ok(())
+}
+
+async fn add_item(
+    State(state): State<AppState>,
+    Json(payload): Json<AddItemRequest>,
+) -> Json<String> {
+    let mut db = state.vector_db.lock().await;
+    match db.add_item(&payload.item) {
+        Ok(_) => Json("Item added successfully".to_string()),
+        Err(e) => Json(format!("Error adding item: {}", e)),
+    }
+}
+
+// async fn remove_item(
+//     State(state): State<AppState>,
+//     Json(payload): Json<RemoveItemRequest>,
+// ) -> Json<String> {
+//     let mut db = state.vector_db.lock().await;
+//     match db.remove_item(&payload.item) {
+//         Ok(_) => Json("Item removed successfully".to_string()),
+//         Err(e) => Json(format!("Error removing item: {}", e)),
+//     }
+// }
+
+async fn find_top_k_query(
+    State(state): State<AppState>,
+    Json(payload): Json<FindTopKRequest>,
+) -> Json<TopKResponse> {
+    let db = state.vector_db.lock().await;
+    let results = db.find_k_neighbors(&payload.query, payload.k);
+    Json(TopKResponse { results })
 }
