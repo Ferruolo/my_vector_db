@@ -31,6 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "The comedian's jokes had the audience roaring with laughter.",
         "Athletes from around the world gathered for the opening ceremony of the Olympics.",
         "The aroma of freshly baked bread wafted through the small bakery.",
+        "Researchers conducted experiments in space to study the effects of weightlessness on plant growth."
     ];
 
     for sentence in &sentences {

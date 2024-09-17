@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use tch::{jit, Tensor};
 use tiktoken_rs::{p50k_base, CoreBPE};
-use crate::EMBEDDING_PATH;
 
 // Define a trait for tokenizer operations
 pub trait TokenizerInterface {

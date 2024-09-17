@@ -1,5 +1,5 @@
-use tch::{Device, Kind, Scalar, Tensor};
 use crate::ml_interface::{Embedding, LlamaTokenizer, TokenizerInterface};
+use tch::{Device, Kind, Tensor};
 
 trait VectorItem {
     fn from_text(text_data: &str, embedding: &Embedding, llama_tokenizer: &LlamaTokenizer) -> Self;
@@ -24,18 +24,20 @@ impl DbItem {
     }
 }
 
+
 impl VectorItem for DbItem {
     fn from_text(text_data: &str, embedding: &Embedding, llama_tokenizer: &LlamaTokenizer) -> Self {
         let tokens = llama_tokenizer.encode(text_data);
-        let token_count = tokens.len() as f64;
+   
         let sum_token = tokens.iter().fold(
             Tensor::zeros(&[4096], (Kind::Float, Device::Cpu)),
             |acc, &idx| acc + embedding.forward(idx as i64).unwrap()
         );
-        let average_token = sum_token / token_count;
+        let token_norm = sum_token.norm();
+        let unit_vector = sum_token / token_norm;
         Self {
             text_data: text_data.to_string(),
-            vector_data: average_token
+            vector_data: unit_vector
         }
     }
 
@@ -72,6 +74,10 @@ impl VectorDBCore {
             .map(|(i, item)| (i, item.compare(&query_item)))
             .collect();
 
+        for (score, item) in scores.iter().zip(&self.data) {
+            println!("Item: {} | score {}", score.1, item.text_data);
+        } 
+        
         scores.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         scores.into_iter()
