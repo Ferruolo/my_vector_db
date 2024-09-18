@@ -68,6 +68,15 @@ impl VectorDBCore {
         self.data.push(DbItem::from_text(text_item, &self.embedding, &self.tokenizer));
         Ok(())
     }
+    
+    pub fn remove_item(&mut self, text_item: &str) -> Result<(), Box<dyn std::error::Error>> {
+        for i in 0..self.data.len() {
+            if self.data[i].text_data == text_item {
+                self.data.remove(i);
+            }
+        }
+        Ok(())
+    }
 
     pub fn find_k_neighbors(&self, text_item: &str, k: usize) -> Vec<String> {
         let query_item = DbItem::from_text(text_item, &self.embedding, &self.tokenizer);

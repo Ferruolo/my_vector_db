@@ -71,16 +71,16 @@ async fn add_item(
     }
 }
 
-// async fn remove_item(
-//     State(state): State<AppState>,
-//     Json(payload): Json<RemoveItemRequest>,
-// ) -> Json<String> {
-//     let mut db = state.vector_db.lock().await;
-//     match db.remove_item(&payload.item) {
-//         Ok(_) => Json("Item removed successfully".to_string()),
-//         Err(e) => Json(format!("Error removing item: {}", e)),
-//     }
-// }
+async fn remove_item(
+    State(state): State<AppState>,
+    Json(payload): Json<RemoveItemRequest>,
+) -> Json<String> {
+    let mut db = state.vector_db.lock().await;
+    match db.remove_item(&payload.item) {
+        Ok(_) => Json("Item removed successfully".to_string()),
+        Err(e) => Json(format!("Error removing item: {}", e)),
+    }
+}
 
 async fn find_top_k_query(
     State(state): State<AppState>,
