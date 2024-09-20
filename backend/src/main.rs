@@ -12,6 +12,7 @@ use crate::database_core::VectorDBCore;
 
 mod database_core;
 mod ml_interface;
+mod vector_b_tree;
 
 const EMBEDDING_PATH: &str = "./embedding.pt";
 
