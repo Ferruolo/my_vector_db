@@ -1,83 +1,104 @@
-use std::ops::Deref;
-use std::sync::{Arc, Mutex};
-use crate::vector_b_tree::TreeNode::*;
+use crate::vector_b_tree::TreeNode::{BranchNode, LeafNode, Null};
 
-const ITEMS_PER_PAGE: usize = 5;
-const MAX_LIVE_ELEMENTS: usize =  20;
+const ELEMENTS_PER_PAGE: usize = 4;
+
+type DataType = String;
+type IndexType = usize;
+
+// Beautiful, functional code. Amazing, except it isn't totally functional (yet)
 
 
-enum TreeNode {
-    DiskItem(String),
-    LeafNode(LeafItem),
-    BranchNode(BranchItem),
-    Null
+// Can we combine these two similar items?
+struct BranchItem {
+    indexes: Vec<IndexType>,
+    data: Vec<TreeNode>,
+}
+
+impl BranchItem {
+    fn new() -> Self {
+        Self {
+            indexes: vec![],
+            data: vec![],
+        }
+    }
 }
 
 struct LeafItem {
-    indexes: Vec<usize>,
-    data: Vec<String>
+    indexes: Vec<IndexType>,
+    data: Vec<DataType>,
 }
 
 impl LeafItem {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             indexes: vec![],
-            data: vec![]
+            data: vec![],
         }
     }
-    pub fn add_item(&mut self, index: usize, data: String) {
-        self.indexes.push(index);
-        self.data.push(data);
+}
+
+enum TreeNode {
+    LeafNode(LeafItem),
+    BranchNode(BranchItem),
+    Null,
+}
+
+fn leaf_item_mitosis(mut node: LeafItem, index: IndexType, data: DataType) -> TreeNode {
+    node = leaf_array_insertion(node, index, data);
+    let midpt = node.indexes[ELEMENTS_PER_PAGE.div_ceil(2)];
+    let mut left = LeafItem::new();
+    let mut right = LeafItem::new();
+    // might not have done this right, help!!!
+    for (arr_index, arr_data) in node.indexes.iter().zip(node.data) {
+        if arr_index < &midpt {
+            left.indexes.push(arr_index.clone());
+            left.data.push(arr_data);
+        } else {
+            right.indexes.push(arr_index.clone());
+            right.data.push(arr_data);
+        }
+    }
+    let mut new_branch = BranchItem::new();
+    new_branch.indexes.push(midpt);
+    new_branch.data.push(LeafNode(left));
+    new_branch.data.push(LeafNode(right));
+    BranchNode(new_branch)
+}
+
+//I never know if going with the imperative route or the functional route is better for the compiler
+fn leaf_array_insertion(mut node: LeafItem, index: IndexType, data: DataType) -> LeafItem {
+    let insert_position = node.indexes.binary_search(&index).unwrap_or_else(|pos| pos);
+    node.indexes.insert(insert_position, index);
+    node.data.insert(insert_position, data);
+    node
+}
+//Make sure we take ownership here, no borrowing.   <- this may not scale
+fn insert_into_leaf_node(node: LeafItem, index: IndexType, data: DataType) -> TreeNode {
+    if (node.indexes.contains(&index)) {
+        return LeafNode(node)
+    } else if (node.indexes.len() >= ELEMENTS_PER_PAGE) {
+        return leaf_item_mitosis(node, index, data)
+    } else {
+        return LeafNode(leaf_array_insertion(node, index, data));
     }
 }
 
-
-struct BranchItem {
-    indexes: Vec<usize>,
-    children: Vec<Arc<Mutex<TreeNode>>>
-}
-
-struct VectorBTree {
-    root: Arc<Mutex<TreeNode>>,
-    num_items: usize,
-    items_per_page: usize,
-    current_occupancy: usize,
-    max_occupancy: usize,
+fn insert_into_branch_node(node: BranchItem, index: IndexType, data: DataType) -> TreeNode {
+    return Null 
 }
 
 
-fn insert_item(node: Arc<Mutex<TreeNode>>, index: usize, data: String) {
-    match &node.lock().unwrap().deref() {
-        DiskItem(filepath) => {
-            todo!("Add protobufs integration and caching")
-        }
+fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
+    match node {
         LeafNode(node) => {
-            node.add_item(index, data)
+            insert_into_leaf_node(node, index, data)
         }
-        BranchNode(_) => {}
+        TreeNode::BranchNode(node) => {
+            
+        }
         Null => {
-            let mut new_node = LeafItem::new();
-            new_node.add_item(index, data);
-            new_node;
+            let new_item = LeafItem::new();
+            insert_into_leaf_node(new_item, index, data)
         }
     }
 }
-
-
-impl VectorBTree {
-    pub fn new() -> Self {
-        Self {
-            root: Arc::new(Mutex::new(Null)),
-            num_items: 0,
-            items_per_page: ITEMS_PER_PAGE,
-            max_occupancy: MAX_LIVE_ELEMENTS,
-            current_occupancy: 0,
-        }
-    }
-
-    pub fn add_item(&mut self, index: usize, text_data: String) {
-        self.root = insert_item(self.root)
-    }
-}
-
-
