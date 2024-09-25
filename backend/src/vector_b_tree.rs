@@ -190,7 +190,7 @@ fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
 //             swap(&mut delete_path, &mut x.data[arr_idx]); // This is NOT FUNCTIONAL
 //             // I don't know why you'd commit to that ^
 //             x.data[arr_idx] = delete_item(delete_path, index);
-//             
+//
 //             BranchNode(x)
 //         }
 //         Null => { Null }
@@ -227,3 +227,39 @@ fn set_data(tree_node: &mut TreeNode, index: IndexType, data: DataType) -> bool 
 }
 
 
+/*
+    Wrapper!
+ */
+
+pub struct BTree {
+    root: TreeNode,
+    num_elements: usize
+}
+
+impl BTree {
+    pub fn new() -> BTree {
+        Self {
+            root: Null,
+            num_elements: 0,
+        }
+    }
+    pub fn insert(&mut self, index: IndexType, data: DataType) {
+        let mut root_item = Null;
+        swap(&mut self.root, &mut root_item);
+        self.root = insert_item(root_item, index, data);
+    }
+    
+    pub fn remove(&mut self, index: IndexType) {
+        todo!("Haven't Implemented Delete Yet")
+    }
+    
+    pub fn get_item(&mut self, index: IndexType) -> Option<DataType> {
+        get_data(&self.root, index)
+    }
+    
+    pub fn set_item(&mut self, index: IndexType, data: DataType) {
+        set_data(&mut self.root, index, data);
+    }
+    
+    
+}
