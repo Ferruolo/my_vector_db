@@ -1,4 +1,6 @@
 use std::mem::swap;
+use axum::routing::get;
+use crate::remove_item;
 use crate::vector_b_tree::BranchChildType::Leaf;
 use crate::vector_b_tree::TreeNode::{BranchNode, LeafNode, Null, OverflowNode};
 
@@ -157,11 +159,6 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
 }
 
 
-
-
-
-
-
 /*
  * Base Functions
 */
@@ -184,18 +181,49 @@ fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
     }
 }
 
-fn delete_item(node: TreeNode, index: IndexType) -> TreeNode {
-    match node {
-        LeafNode(_) => { Null }
+// fn delete_item(node: TreeNode, index: IndexType) -> TreeNode {
+//     match node {
+//         LeafNode(_) => { Null }
+//         BranchNode(x) => {
+//             let arr_idx = binary_search(&x.indexes, compare_index_type, &index);
+//             let mut delete_path = Null;
+//             swap(&mut delete_path, &mut x.data[arr_idx]); // This is NOT FUNCTIONAL
+//             // I don't know why you'd commit to that ^
+//             x.data[arr_idx] = delete_item(delete_path, index);
+//             
+//             BranchNode(x)
+//         }
+//         Null => { Null }
+//         _ => panic!("This should not happen")
+//     }
+// }
+
+fn get_data(tree_node: &TreeNode, index: IndexType) -> Option<DataType> {
+    match tree_node {
+        LeafNode(x) => {Some(x.data.get(index).unwrap().clone())}
         BranchNode(x) => {
             let arr_idx = binary_search(&x.indexes, compare_index_type, &index);
-            let mut delete_path = Null;
-            swap(&mut delete_path, &mut x.data[arr_idx]); // This is NOT FUNCTIONAL
-            // I don't know why you'd commit to that ^
-            x.data[arr_idx] = delete_item(delete_path, index);
-            BranchNode(x)
+            get_data(&x.data[arr_idx], index)
         }
-        Null => { Null }
-        _ => panic!("This should not happen")
+        _ => None,
     }
 }
+
+fn set_data(tree_node: &mut TreeNode, index: IndexType, data: DataType) -> bool {
+    match tree_node {
+        LeafNode(x) => {
+            let arr_idx = binary_search(&x.indexes, compare_index_type, &index);
+            x.data[arr_idx] = data;
+            true
+        }
+        BranchNode(x) => {
+            let arr_idx = binary_search(&x.indexes, compare_index_type, &index);
+            set_data(&mut x.data[arr_idx], index, data)
+        }
+        _ => {
+            false
+        }
+    }
+}
+
+
