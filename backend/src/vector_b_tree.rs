@@ -1,4 +1,5 @@
 use std::mem::swap;
+use crate::vector_b_tree::BranchChildType::Leaf;
 use crate::vector_b_tree::TreeNode::{BranchNode, LeafNode, Null, OverflowNode};
 
 const ELEMENTS_PER_PAGE: usize = 4;
@@ -11,6 +12,13 @@ type IndexType = usize;
 struct BranchItem {
     indexes: Vec<IndexType>,
     data: Vec<TreeNode>,
+    branch_type: BranchChildType
+}
+
+enum BranchChildType { // Assert that all types are equal throughout the branch
+    Null,
+    Leaf,
+    Branch
 }
 
 fn binary_search<F>(vec: &[IndexType], comparator: F, index: &IndexType) -> usize
@@ -36,6 +44,7 @@ impl BranchItem {
         Self {
             indexes: vec![],
             data: vec![],
+            branch_type: BranchChildType::Null,
         }
     }
 }
@@ -61,12 +70,17 @@ enum TreeNode {
     Null,
 }
 
+
+/*
+ *  Insert Helper Functions
+*/
+
 fn leaf_item_mitosis(mut node: LeafItem, index: IndexType, data: DataType) -> TreeNode {
     node = leaf_array_insertion(node, index, data);
     let midpt = ELEMENTS_PER_PAGE.div_ceil(2);
     let mut left = LeafItem::new();
     let mut right = LeafItem::new();
-    
+
     assert_eq!(node.indexes.len(), node.data.len());
     // We need to take ownership here
     let cur_idx = node.indexes.len() - 1;
@@ -75,8 +89,8 @@ fn leaf_item_mitosis(mut node: LeafItem, index: IndexType, data: DataType) -> Tr
         new_leaf.data.push(d);
         new_leaf.indexes.push(idx);
     }
-    // How do we split
-    OverflowNode(Box::new(LeafNode(left)), 0 /* TODO FIOX THIS*/, Box::new(LeafNode(right)))
+
+    OverflowNode(Box::new(LeafNode(left)), 0 /* TODO FIX THIS*/, Box::new(LeafNode(right)))
 }
 
 //I never know if going with the imperative route or the functional route is better for the compiler
@@ -97,23 +111,60 @@ fn insert_into_leaf_node(node: LeafItem, index: IndexType, data: DataType) -> Tr
     }
 }
 
+fn compare_index_type(left: &IndexType, right: &IndexType) -> bool {
+    left < right
+}
 
-
-
-fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataType) -> (TreeNode, TreeNode) {
-    let idx = binary_search(&node.indexes, |left, right| {left < right}, &index);
+fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataType) -> TreeNode{
+    let idx = binary_search(&node.indexes, compare_index_type, &index);
     let mut selected = Null;
     swap(&mut selected, &mut node.data[idx]);
     let result = match insert_item(selected, index, data) {
-        LeafNode(_) => {}
-        BranchNode(_) => {}
-        Null => {}
+        BranchNode(node) => {node}
+        OverflowNode(left, new_index, right) => {
+            match (*left, *right) { 
+                (LeafNode(l), LeafNode(r)) => {
+                    match node.branch_type {
+                        Leaf => {()} // Null Op for Enum
+                        _ => {panic!("Wrong Type of merge here????!!")}
+                    }
+                    let left_idx = binary_search(&node.indexes, compare_index_type, &new_index);
+                    node.indexes.insert(left_idx, new_index);
+                    // Oh how I hate to code imperatively (jk I'm too dumb not to)
+                    node.data[left_idx] =  LeafNode(l);
+                    node.data.insert(left_idx + 1, LeafNode(r));
+                    node
+                }
+                (BranchNode(l), BranchNode(r)) => {
+                    match node.branch_type {
+                        BranchChildType::Branch => {()} // Null Op for Enum
+                        _ => {panic!("Wrong Type of merge here????!!")}
+                    }
+                    let left_idx = binary_search(&node.indexes, compare_index_type, &new_index);
+                    node.indexes.insert(left_idx, new_index);
+                    // Oh how I hate to code imperatively (jk I'm too dumb not to)
+                    node.data[left_idx] =  BranchNode(l);
+                    node.data.insert(left_idx + 1, BranchNode(r));
+                    node
+                }
+                _ => {panic!("And you may ask yourself 'How did I get here'")}                
+            }
+        }
+        _ => {panic!("And you may ask yourself 'How did I get here'")}
     };
     
-    
-    
+    Null
 }
 
+
+
+
+
+
+
+/*
+ * Base Functions
+*/
 
 fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
     match node {
@@ -127,5 +178,24 @@ fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
             let new_item = LeafItem::new();
             insert_into_leaf_node(new_item, index, data)
         }
+        OverflowNode(left, new_index, right) => {
+            OverflowNode(left, new_index, right)
+        }
+    }
+}
+
+fn delete_item(node: TreeNode, index: IndexType) -> TreeNode {
+    match node {
+        LeafNode(_) => { Null }
+        BranchNode(x) => {
+            let arr_idx = binary_search(&x.indexes, compare_index_type, &index);
+            let mut delete_path = Null;
+            swap(&mut delete_path, &mut x.data[arr_idx]); // This is NOT FUNCTIONAL
+            // I don't know why you'd commit to that ^
+            x.data[arr_idx] = delete_item(delete_path, index);
+            BranchNode(x)
+        }
+        Null => { Null }
+        _ => panic!("This should not happen")
     }
 }
