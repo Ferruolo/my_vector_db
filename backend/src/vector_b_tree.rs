@@ -1,6 +1,4 @@
 use std::mem::swap;
-use axum::routing::get;
-use crate::remove_item;
 use crate::vector_b_tree::BranchChildType::Leaf;
 use crate::vector_b_tree::TreeNode::{BranchNode, LeafNode, Null, OverflowNode};
 
@@ -248,21 +246,20 @@ impl BTree {
         swap(&mut self.root, &mut root_item);
         self.root = insert_item(root_item, index, data);
     }
-    
+
     pub fn remove(&mut self, index: IndexType) {
         todo!("Haven't Implemented Delete Yet")
     }
-    
+
     pub fn get_item(&mut self, index: IndexType) -> Option<DataType> {
         get_data(&self.root, index)
     }
-    
+
     pub fn set_item(&mut self, index: IndexType, data: DataType) {
         set_data(&mut self.root, index, data);
     }
 }
 
-use super::*;
 
 #[cfg(test)]
 mod tests {
@@ -356,11 +353,104 @@ mod tests {
         assert_eq!(tree.get_item(2), Some("Two".to_string()));
     }
 
-    // Note: We can't test the remove() method as it's not implemented yet
+
     #[test]
-    #[should_panic(expected = "Haven't Implemented Delete Yet")]
-    fn test_remove_unimplemented() {
+    fn test_insert_and_get_1000_sequential_items() {
         let mut tree = BTree::new();
-        tree.remove(0);
+        for i in 0..1000 {
+            tree.insert(i, i.to_string());
+        }
+
+        for i in 0..1000 {
+            assert_eq!(tree.get_item(i), Some(i.to_string()));
+        }
+    }
+
+    #[test]
+    fn test_insert_and_get_1000_reverse_order_items() {
+        let mut tree = BTree::new();
+        for i in (0..1000).rev() {
+            tree.insert(i, i.to_string());
+        }
+
+        for i in 0..1000 {
+            assert_eq!(tree.get_item(i), Some(i.to_string()));
+        }
+    }
+
+    #[test]
+    fn test_insert_1000_items_and_overwrite() {
+        let mut tree = BTree::new();
+        for i in 0..1000 {
+            tree.insert(i, format!("Original {}", i));
+        }
+
+        for i in 0..1000 {
+            tree.insert(i, format!("Updated {}", i));
+        }
+
+        for i in 0..1000 {
+            assert_eq!(tree.get_item(i), Some(format!("Updated {}", i)));
+        }
+    }
+
+    #[test]
+    fn test_insert_1000_items_with_gaps() {
+        let mut tree = BTree::new();
+        for i in 0..1000 {
+            tree.insert(i * 2, i.to_string());
+        }
+
+        for i in 0..1000 {
+            assert_eq!(tree.get_item(i * 2), Some(i.to_string()));
+            assert_eq!(tree.get_item(i * 2 + 1), None);
+        }
+    }
+
+    #[test]
+    fn test_insert_and_update_1000_items() {
+        let mut tree = BTree::new();
+        for i in 0..1000 {
+            tree.insert(i, format!("Original {}", i));
+        }
+
+        for i in 0..1000 {
+            tree.set_item(i, format!("Updated {}", i));
+        }
+
+        for i in 0..1000 {
+            assert_eq!(tree.get_item(i), Some(format!("Updated {}", i)));
+        }
+    }
+
+    #[test]
+    fn test_insert_1000_items_random_order() {
+        use rand::seq::SliceRandom;
+        let mut rng = rand::thread_rng();
+        let mut indices: Vec<usize> = (0..1000).collect();
+        indices.shuffle(&mut rng);
+
+        let mut tree = BTree::new();
+        for &i in &indices {
+            tree.insert(i, i.to_string());
+        }
+
+        for i in 0..1000 {
+            assert_eq!(tree.get_item(i), Some(i.to_string()));
+        }
+    }
+
+    #[test]
+    fn test_insert_and_get_large_indices() {
+        let mut tree = BTree::new();
+        let large_indices = [10000, 100000, 1000000, 10000000];
+
+        for &index in &large_indices {
+            tree.insert(index, format!("Large {}", index));
+        }
+
+        for &index in &large_indices {
+            assert_eq!(tree.get_item(index), Some(format!("Large {}", index)));
+        }
     }
 }
