@@ -260,6 +260,107 @@ impl BTree {
     pub fn set_item(&mut self, index: IndexType, data: DataType) {
         set_data(&mut self.root, index, data);
     }
-    
-    
+}
+
+use super::*;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_btree() {
+        let tree = BTree::new();
+        assert_eq!(tree.num_elements, 0);
+    }
+
+    #[test]
+    fn test_insert_and_get_single_item() {
+        let mut tree = BTree::new();
+        tree.insert(0, "Hello".to_string());
+        assert_eq!(tree.get_item(0), Some("Hello".to_string()));
+    }
+
+    #[test]
+    fn test_insert_and_get_multiple_items() {
+        let mut tree = BTree::new();
+        tree.insert(0, "First".to_string());
+        tree.insert(1, "Second".to_string());
+        tree.insert(2, "Third".to_string());
+
+        assert_eq!(tree.get_item(0), Some("First".to_string()));
+        assert_eq!(tree.get_item(1), Some("Second".to_string()));
+        assert_eq!(tree.get_item(2), Some("Third".to_string()));
+    }
+
+    #[test]
+    fn test_insert_overwrite() {
+        let mut tree = BTree::new();
+        tree.insert(0, "Original".to_string());
+        tree.insert(0, "Overwritten".to_string());
+
+        assert_eq!(tree.get_item(0), Some("Overwritten".to_string()));
+    }
+
+    #[test]
+    fn test_get_nonexistent_item() {
+        let mut tree = BTree::new();
+        tree.insert(0, "Exists".to_string());
+
+        assert_eq!(tree.get_item(1), None);
+    }
+
+    #[test]
+    fn test_set_item() {
+        let mut tree = BTree::new();
+        tree.insert(0, "Original".to_string());
+        tree.set_item(0, "Updated".to_string());
+
+        assert_eq!(tree.get_item(0), Some("Updated".to_string()));
+    }
+
+    #[test]
+    fn test_set_nonexistent_item() {
+        let mut tree = BTree::new();
+        tree.set_item(0, "New".to_string());
+
+        assert_eq!(tree.get_item(0), Some("New".to_string()));
+    }
+
+    #[test]
+    fn test_insert_large_index() {
+        let mut tree = BTree::new();
+        tree.insert(1000000, "Large Index".to_string());
+
+        assert_eq!(tree.get_item(1000000), Some("Large Index".to_string()));
+    }
+
+    #[test]
+    fn test_insert_and_get_empty_string() {
+        let mut tree = BTree::new();
+        tree.insert(0, "".to_string());
+
+        assert_eq!(tree.get_item(0), Some("".to_string()));
+    }
+
+    #[test]
+    fn test_multiple_operations() {
+        let mut tree = BTree::new();
+        tree.insert(0, "Zero".to_string());
+        tree.insert(1, "One".to_string());
+        tree.set_item(0, "Updated Zero".to_string());
+        tree.insert(2, "Two".to_string());
+
+        assert_eq!(tree.get_item(0), Some("Updated Zero".to_string()));
+        assert_eq!(tree.get_item(1), Some("One".to_string()));
+        assert_eq!(tree.get_item(2), Some("Two".to_string()));
+    }
+
+    // Note: We can't test the remove() method as it's not implemented yet
+    #[test]
+    #[should_panic(expected = "Haven't Implemented Delete Yet")]
+    fn test_remove_unimplemented() {
+        let mut tree = BTree::new();
+        tree.remove(0);
+    }
 }
