@@ -16,26 +16,35 @@ struct BranchItem {
     branch_type: BranchChildType
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum BranchChildType { // Assert that all types are equal throughout the branch
     Null,
     Leaf,
     Branch
 }
 
-fn binary_search<F>(vec: &[IndexType], comparator: F, index: &IndexType) -> usize
+
+fn print_branch_type(x: &BranchChildType) -> String {
+    match x {
+        BranchChildType::Null => { "NULL".parse().unwrap() }
+        Leaf => { "LEAF".parse().unwrap() }
+        Branch => { "BRANCH".parse().unwrap() }
+    }
+}
+
+fn binary_search<F>(index_list: &Vec<IndexType>, comparator: F, index: &IndexType) -> IndexType
 where
     F: Fn(&IndexType, &IndexType) -> bool,
 {
     let mut low: usize = 0;
-    let mut high: usize = vec.len();
+    let mut high: usize = index_list.len();
 
     while low < high {
         let mid = low + (high - low) / 2;
-        if comparator(&vec[mid], index) {
-            high = mid;
-        } else {
+        if comparator(&index_list[mid], index) {
             low = mid + 1;
+        } else {
+            high = mid;
         }
     }
     low
@@ -66,7 +75,6 @@ impl LeafItem {
     }
 }
 
-
 #[derive(Debug)]
 enum TreeNode {
     LeafNode(LeafItem),
@@ -81,7 +89,7 @@ fn find_midpoint(a: &IndexType, b: &IndexType) -> IndexType {
 
 impl TreeNode {
     fn print(&self, depth: usize) {
-        let indent = "  ".repeat(depth);
+        let indent = "-".repeat(depth);
         match self {
             LeafNode(leaf) => {
                 println!("{}LeafNode:", indent);
@@ -90,7 +98,7 @@ impl TreeNode {
                 }
             }
             BranchNode(branch) => {
-                println!("{}BranchNode:", indent);
+                println!("{}BranchNode({} Type, {} Index Len, {} Data Len):", indent, print_branch_type(&branch.branch_type), branch.indexes.len(), branch.data.len());
                 for (idx, child) in branch.indexes.iter().zip(branch.data.iter()) {
                     child.print(depth + 1);
                     println!("{}  {} ->", indent, idx);
@@ -136,6 +144,36 @@ fn leaf_item_mitosis(mut node: LeafItem, index: IndexType, data: DataType) -> Tr
     OverflowNode(Box::new(LeafNode(left)), new_midpoint, Box::new(LeafNode(right)))
 }
 
+fn branch_item_mitosis(mut node: BranchItem) -> TreeNode {
+    let midpt = ELEMENTS_PER_PAGE.div_ceil(2);
+    let mut left = BranchItem::new();
+    let mut right = BranchItem::new();
+    node.indexes.reverse();
+    node.data.reverse();
+    left.branch_type = node.branch_type.clone();
+    right.branch_type = node.branch_type;
+    
+    let mut cur_idx = node.indexes.len();
+    while let Some(idx) = node.indexes.pop() {
+        let new_leaf = if cur_idx > midpt { &mut left } else { &mut right };
+        new_leaf.indexes.push(idx);
+        cur_idx -= 1;
+    }
+
+
+    cur_idx = node.data.len();
+    while let Some(datum) = node.data.pop() {
+        let new_leaf = if cur_idx > (midpt + 1) { &mut left } else { &mut right };
+        new_leaf.data.push(datum);
+        cur_idx -= 1;
+    }
+
+    // This might be a bad assumption, tbd
+    let new_midpt = left.indexes.pop().unwrap();
+
+    OverflowNode(Box::new(BranchNode(left)), new_midpt, Box::new(BranchNode(right)))
+}
+
 //I never know if going with the imperative route or the functional route is better for the compiler
 fn leaf_array_insertion(mut node: LeafItem, index: IndexType, data: DataType) -> LeafItem {
     let insert_position = node.indexes.binary_search(&index).unwrap_or_else(|pos| pos);
@@ -163,11 +201,13 @@ fn compare_index_type(left: &IndexType, right: &IndexType) -> bool {
     left < right
 }
 
-fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataType) -> TreeNode{
-    let idx = binary_search(&node.indexes, compare_index_type, &index); // Returns wrong index for (16)
+fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataType) -> TreeNode {
+
+    let idx = binary_search(&node.indexes, compare_index_type, &index);
+    
     let mut selected = Null;
     swap(&mut selected, &mut node.data[idx]);
-    let result = match insert_item(selected, index, data) {
+    let mut result = match insert_item(selected, index, data) {
         BranchNode(x) => {
             node.data[idx] = BranchNode(x);
             node
@@ -207,9 +247,12 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
         }
         _ => {panic!("And you may ask yourself 'How did I get here'")}
     };
-    BranchNode(result)
+    if result.data.len() > ELEMENTS_PER_PAGE {
+        branch_item_mitosis(result)
+    } else {
+        BranchNode(result)
+    }
 }
-
 
 /*
  * Base Functions
@@ -278,9 +321,8 @@ fn set_data(tree_node: &mut TreeNode, index: IndexType, data: DataType) -> bool 
     }
 }
 
-
 /*
-    Wrapper!
+ *  Wrapper!
  */
 
 pub struct BTree {
@@ -295,6 +337,7 @@ impl BTree {
             num_elements: 0,
         }
     }
+
     pub fn insert(&mut self, index: IndexType, data: DataType) {
         let mut root_item = Null;
         swap(&mut self.root, &mut root_item);
@@ -334,8 +377,10 @@ impl BTree {
     }
 
     pub fn print(&self) {
+        println!("{}", "=".repeat(10));
         println!("BTree (num_elements: {}):", self.num_elements);
         self.root.print(0);
+        println!("{}", "=".repeat(10));
     }
 }
 

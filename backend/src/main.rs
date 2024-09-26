@@ -1,22 +1,69 @@
-use std::error::Error;
 use crate::vector_b_tree::BTree;
 
 mod vector_b_tree;
 
 fn main () {
     let mut tree = BTree::new();
-    tree.insert(0, "Zero".to_string());
-    tree.insert(9, "Nine".to_string());
+    tree.insert(0, "0".to_string());
     tree.insert(1, "1".to_string());
+    tree.insert(2, "2".to_string());
+    tree.insert(3, "3".to_string());
     tree.insert(4, "4".to_string());
-    
-    tree.insert(5, "Five".to_string());
-    tree.insert(16, "16".to_string());
+    tree.insert(5, "5".to_string());
+    tree.insert(6, "6".to_string());
     tree.insert(7, "7".to_string());
-    tree.insert(19, "19".to_string());
-
+    tree.insert(8, "8".to_string());
+    tree.insert(9, "9".to_string());
+    tree.insert(10, "10".to_string());
+    tree.insert(11, "11".to_string());
+    tree.insert(12, "12".to_string());
     tree.insert(13, "13".to_string());
-
+    tree.insert(14, "14".to_string());
+    tree.insert(15, "15".to_string());
+    tree.insert(16, "16".to_string());
+    tree.insert(17, "17".to_string());
+    tree.insert(18, "18".to_string());
+    tree.insert(19, "19".to_string());
+    tree.insert(20, "20".to_string());
+    tree.insert(21, "21".to_string());
+    tree.insert(22, "22".to_string());
+    tree.insert(23, "23".to_string());
+    tree.insert(24, "24".to_string());
+    tree.insert(25, "25".to_string());
+    tree.insert(26, "26".to_string());
+    tree.insert(27, "27".to_string());
+    tree.insert(28, "28".to_string());
+    tree.insert(29, "29".to_string());
+    tree.insert(30, "30".to_string());
+    tree.insert(31, "31".to_string());
+    tree.insert(32, "32".to_string());
+    tree.insert(33, "33".to_string());
+    tree.insert(34, "34".to_string());
+    tree.insert(35, "35".to_string());
+    tree.insert(36, "36".to_string());
+    tree.insert(37, "37".to_string());
+    tree.insert(38, "38".to_string());
+    tree.insert(39, "39".to_string());
+    tree.insert(40, "40".to_string());
+    tree.insert(41, "41".to_string());
+    tree.insert(42, "42".to_string());
+    tree.insert(43, "43".to_string());
+    tree.insert(44, "44".to_string());
+    tree.insert(45, "45".to_string());
+    tree.insert(46, "46".to_string());
+    tree.insert(47, "47".to_string());
+    tree.insert(48, "48".to_string());
+    tree.insert(49, "49".to_string());
+    tree.insert(50, "50".to_string());
+    tree.insert(51, "51".to_string());
+    tree.insert(52, "52".to_string());
+    tree.insert(53, "53".to_string());
+    tree.insert(54, "54".to_string());
+    tree.insert(55, "55".to_string());
+    tree.insert(56, "56".to_string());
+    tree.insert(57, "57".to_string());
+    tree.insert(58, "58".to_string());
+    tree.insert(59, "59".to_string());
     tree.print();
 
 }
