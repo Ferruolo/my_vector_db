@@ -1,5 +1,5 @@
 use std::mem::swap;
-use crate::vector_b_tree::BranchChildType::Leaf;
+use crate::vector_b_tree::BranchChildType::{Branch, Leaf};
 use crate::vector_b_tree::TreeNode::{BranchNode, LeafNode, Null, OverflowNode};
 
 const ELEMENTS_PER_PAGE: usize = 4;
@@ -164,7 +164,7 @@ fn compare_index_type(left: &IndexType, right: &IndexType) -> bool {
 }
 
 fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataType) -> TreeNode{
-    let idx = binary_search(&node.indexes, compare_index_type, &index);
+    let idx = binary_search(&node.indexes, compare_index_type, &index); // Returns wrong index for (16)
     let mut selected = Null;
     swap(&mut selected, &mut node.data[idx]);
     let result = match insert_item(selected, index, data) {
@@ -216,7 +216,7 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
 */
 
 fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
-    let result =  match node {
+    match node {
         LeafNode(node) => {
             insert_into_leaf_node(node, index, data)
         }
@@ -230,21 +230,6 @@ fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
         OverflowNode(left, new_index, right) => {
             OverflowNode(left, new_index, right)
         }
-    };
-    // Can we do this more elegantly please??
-    match result {
-        LeafNode(x) => {LeafNode(x)}
-        BranchNode(x) => {BranchNode(x)}
-        OverflowNode(l, idx, r) => {
-            let mut new_branch = BranchItem::new();
-            new_branch.indexes.push(idx);
-            let branch_left = *l;
-            let branch_right = *r;
-            new_branch.data.push(branch_left);
-            new_branch.data.push(branch_right);
-            BranchNode(new_branch)
-        }
-        Null => {Null}
     }
 }
 
@@ -313,7 +298,26 @@ impl BTree {
     pub fn insert(&mut self, index: IndexType, data: DataType) {
         let mut root_item = Null;
         swap(&mut self.root, &mut root_item);
-        self.root = insert_item(root_item, index, data);
+        self.root = match insert_item(root_item, index, data) {
+            OverflowNode(l, idx, r) => {
+                let mut new_branch = BranchItem::new();
+                new_branch.branch_type = match &*l {
+                    LeafNode(_) => {BranchChildType::Leaf}
+                    BranchNode(_) => {BranchChildType::Branch}
+                    OverflowNode(_, _, _) => {BranchChildType::Null}
+                    Null => {
+                        BranchChildType::Null
+                    }
+                };
+                new_branch.indexes.push(idx);
+                new_branch.data.push(*l);
+                new_branch.data.push(*r);
+                BranchNode(new_branch)
+            }
+            x => {
+                x
+            }
+        };
         self.num_elements +=1 ;
     }
 
