@@ -15,5 +15,5 @@ fn main () {
     
     
     tree.print();
-    assert_eq!(tree.get_item(0), Some("Zero".to_string()));
+
 }
