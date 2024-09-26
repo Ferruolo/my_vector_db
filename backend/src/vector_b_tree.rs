@@ -168,7 +168,10 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
     let mut selected = Null;
     swap(&mut selected, &mut node.data[idx]);
     let result = match insert_item(selected, index, data) {
-        BranchNode(node) => {node}
+        BranchNode(x) => {
+            node.data[idx] = BranchNode(x);
+            node
+        }
         OverflowNode(left, new_index, right) => {
             match (*left, *right) { 
                 (LeafNode(l), LeafNode(r)) => {
@@ -197,6 +200,10 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
                 }
                 _ => {panic!("And you may ask yourself 'How did I get here'")}                
             }
+        }
+        LeafNode(x) => {
+            node.data[idx] = LeafNode(x);
+            node
         }
         _ => {panic!("And you may ask yourself 'How did I get here'")}
     };
