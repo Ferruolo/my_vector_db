@@ -16,7 +16,7 @@ struct BranchItem {
     branch_type: BranchChildType
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum BranchChildType { // Assert that all types are equal throughout the branch
     Null,
     Leaf,
@@ -293,9 +293,13 @@ fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
 //     }
 // }
 
-fn get_data(tree_node: &TreeNode, index: IndexType) -> Option<DataType> {
+
+// Should this return reference or copy? TBD
+fn get_data(tree_node: &TreeNode, index: IndexType) -> Option<&DataType> {
     match tree_node {
-        LeafNode(x) => {Some(x.data.get(index).unwrap().clone())}
+        LeafNode(x) => {
+           x.data.get(index)
+        }
         BranchNode(x) => {
             let arr_idx = binary_search(&x.indexes, compare_index_type, &index);
             get_data(&x.data[arr_idx], index)
@@ -368,7 +372,7 @@ impl BTree {
         todo!("Haven't Implemented Delete Yet")
     }
 
-    pub fn get_item(&mut self, index: IndexType) -> Option<DataType> {
+    pub fn get_item(&mut self, index: IndexType) -> Option<&DataType> {
         get_data(&self.root, index)
     }
 
@@ -384,23 +388,27 @@ impl BTree {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::seq::SliceRandom;
 
     #[test]
     fn test_new_btree() {
         let tree = BTree::new();
         assert_eq!(tree.num_elements, 0);
+        match tree.root {
+            Null => {},
+            _ => panic!("New BTree root should be Null"),
+        }
     }
 
     #[test]
     fn test_insert_and_get_single_item() {
         let mut tree = BTree::new();
         tree.insert(0, "Hello".to_string());
-        tree.print();
-        assert_eq!(tree.get_item(0), Some("Hello".to_string()));
+        assert_eq!(tree.num_elements, 1);
+        assert_eq!(tree.get_item(0), Some(&"Hello".to_string()));
     }
 
     #[test]
@@ -409,62 +417,68 @@ mod tests {
         tree.insert(0, "First".to_string());
         tree.insert(1, "Second".to_string());
         tree.insert(2, "Third".to_string());
-    
-        assert_eq!(tree.get_item(0), Some("First".to_string()));
-        assert_eq!(tree.get_item(1), Some("Second".to_string()));
-        assert_eq!(tree.get_item(2), Some("Third".to_string()));
+
+        assert_eq!(tree.num_elements, 3);
+        assert_eq!(tree.get_item(0), Some(&"First".to_string()));
+        assert_eq!(tree.get_item(1), Some(&"Second".to_string()));
+        assert_eq!(tree.get_item(2), Some(&"Third".to_string()));
     }
-    
+
     #[test]
     fn test_insert_overwrite() {
         let mut tree = BTree::new();
         tree.insert(0, "Original".to_string());
         tree.insert(0, "Overwritten".to_string());
-    
-        assert_eq!(tree.get_item(0), Some("Overwritten".to_string()));
+
+        assert_eq!(tree.num_elements, 1);
+        assert_eq!(tree.get_item(0), Some(&"Overwritten".to_string()));
     }
-    
+
     #[test]
     fn test_get_nonexistent_item() {
         let mut tree = BTree::new();
         tree.insert(0, "Exists".to_string());
-    
+
         assert_eq!(tree.get_item(1), None);
     }
-    
+
     #[test]
     fn test_set_item() {
         let mut tree = BTree::new();
         tree.insert(0, "Original".to_string());
         tree.set_item(0, "Updated".to_string());
-    
-        assert_eq!(tree.get_item(0), Some("Updated".to_string()));
+
+        assert_eq!(tree.num_elements, 1);
+        assert_eq!(tree.get_item(0), Some(&"Updated".to_string()));
     }
-    
+
     #[test]
     fn test_set_nonexistent_item() {
         let mut tree = BTree::new();
         tree.set_item(0, "New".to_string());
-    
-        assert_eq!(tree.get_item(0), Some("New".to_string()));
+
+        assert_eq!(tree.num_elements, 1);
+        assert_eq!(tree.get_item(0), Some(&"New".to_string()));
     }
-    
+
     #[test]
     fn test_insert_large_index() {
         let mut tree = BTree::new();
         tree.insert(1000000, "Large Index".to_string());
-    
-        assert_eq!(tree.get_item(1000000), Some("Large Index".to_string()));
+
+        assert_eq!(tree.num_elements, 1);
+        assert_eq!(tree.get_item(1000000), Some(&"Large Index".to_string()));
     }
-    
+
     #[test]
     fn test_insert_and_get_empty_string() {
         let mut tree = BTree::new();
         tree.insert(0, "".to_string());
-    
-        assert_eq!(tree.get_item(0), Some("".to_string()));
+
+        assert_eq!(tree.num_elements, 1);
+        assert_eq!(tree.get_item(0), Some(&"".to_string()));
     }
-    
+
     #[test]
     fn test_multiple_operations() {
         let mut tree = BTree::new();
@@ -472,111 +486,157 @@ mod tests {
         tree.insert(1, "One".to_string());
         tree.set_item(0, "Updated Zero".to_string());
         tree.insert(2, "Two".to_string());
-    
-        assert_eq!(tree.get_item(0), Some("Updated Zero".to_string()));
-        assert_eq!(tree.get_item(1), Some("One".to_string()));
-        assert_eq!(tree.get_item(2), Some("Two".to_string()));
+
+        assert_eq!(tree.num_elements, 3);
+        assert_eq!(tree.get_item(0), Some(&"Updated Zero".to_string()));
+        assert_eq!(tree.get_item(1), Some(&"One".to_string()));
+        assert_eq!(tree.get_item(2), Some(&"Two".to_string()));
     }
-    
-    
+
     #[test]
     fn test_insert_and_get_1000_sequential_items() {
         let mut tree = BTree::new();
         for i in 0..1000 {
             tree.insert(i, i.to_string());
         }
-    
+
+        assert_eq!(tree.num_elements, 1000);
         for i in 0..1000 {
-            assert_eq!(tree.get_item(i), Some(i.to_string()));
+            assert_eq!(tree.get_item(i), Some(&i.to_string()));
         }
     }
-    
+
     #[test]
     fn test_insert_and_get_1000_reverse_order_items() {
         let mut tree = BTree::new();
         for i in (0..1000).rev() {
             tree.insert(i, i.to_string());
         }
-    
+
+        assert_eq!(tree.num_elements, 1000);
         for i in 0..1000 {
-            assert_eq!(tree.get_item(i), Some(i.to_string()));
+            assert_eq!(tree.get_item(i), Some(&i.to_string()));
         }
     }
-    
+
     #[test]
     fn test_insert_1000_items_and_overwrite() {
         let mut tree = BTree::new();
         for i in 0..1000 {
             tree.insert(i, format!("Original {}", i));
         }
-    
+
         for i in 0..1000 {
             tree.insert(i, format!("Updated {}", i));
         }
-    
+
+        assert_eq!(tree.num_elements, 1000);
         for i in 0..1000 {
-            assert_eq!(tree.get_item(i), Some(format!("Updated {}", i)));
+            assert_eq!(tree.get_item(i), Some(&format!("Updated {}", i)));
         }
     }
-    
+
     #[test]
     fn test_insert_1000_items_with_gaps() {
         let mut tree = BTree::new();
         for i in 0..1000 {
             tree.insert(i * 2, i.to_string());
         }
-    
+
+        assert_eq!(tree.num_elements, 1000);
         for i in 0..1000 {
-            assert_eq!(tree.get_item(i * 2), Some(i.to_string()));
+            assert_eq!(tree.get_item(i * 2), Some(&i.to_string()));
             assert_eq!(tree.get_item(i * 2 + 1), None);
         }
     }
-    
+
     #[test]
     fn test_insert_and_update_1000_items() {
         let mut tree = BTree::new();
         for i in 0..1000 {
             tree.insert(i, format!("Original {}", i));
         }
-    
+
         for i in 0..1000 {
             tree.set_item(i, format!("Updated {}", i));
         }
-    
+
+        assert_eq!(tree.num_elements, 1000);
         for i in 0..1000 {
-            assert_eq!(tree.get_item(i), Some(format!("Updated {}", i)));
+            assert_eq!(tree.get_item(i), Some(&format!("Updated {}", i)));
         }
     }
-    
+
     #[test]
     fn test_insert_1000_items_random_order() {
-        use rand::seq::SliceRandom;
         let mut rng = rand::thread_rng();
         let mut indices: Vec<usize> = (0..1000).collect();
         indices.shuffle(&mut rng);
-    
+
         let mut tree = BTree::new();
         for &i in &indices {
             tree.insert(i, i.to_string());
         }
-    
+
+        assert_eq!(tree.num_elements, 1000);
         for i in 0..1000 {
-            assert_eq!(tree.get_item(i), Some(i.to_string()));
+            assert_eq!(tree.get_item(i), Some(&i.to_string()));
         }
     }
-    
+
     #[test]
     fn test_insert_and_get_large_indices() {
         let mut tree = BTree::new();
         let large_indices = [10000, 100000, 1000000, 10000000];
-    
+
         for &index in &large_indices {
             tree.insert(index, format!("Large {}", index));
         }
-    
+
+        assert_eq!(tree.num_elements, large_indices.len());
         for &index in &large_indices {
-            assert_eq!(tree.get_item(index), Some(format!("Large {}", index)));
+            assert_eq!(tree.get_item(index), Some(&format!("Large {}", index)));
         }
     }
 
+    #[test]
+    fn test_tree_structure() {
+        let mut tree = BTree::new();
+        for i in 0..20 {
+            tree.insert(i, i.to_string());
+        }
+
+        match &tree.root {
+            BranchNode(branch) => {
+                assert_eq!(branch.branch_type, BranchChildType::Branch);
+                assert!(branch.indexes.len() > 1);
+                assert_eq!(branch.indexes.len() + 1, branch.data.len());
+            },
+            _ => panic!("Root should be a BranchNode after inserting 20 items"),
+        }
+    }
+
+    #[test]
+    fn test_leaf_node_capacity() {
+        let mut tree = BTree::new();
+        for i in 0..ELEMENTS_PER_PAGE {
+            tree.insert(i, i.to_string());
+        }
+
+        match &tree.root {
+            LeafNode(leaf) => {
+                assert_eq!(leaf.indexes.len(), ELEMENTS_PER_PAGE);
+                assert_eq!(leaf.data.len(), ELEMENTS_PER_PAGE);
+            },
+            _ => panic!("Root should be a LeafNode when number of elements <= ELEMENTS_PER_PAGE"),
+        }
+
+        // Insert one more element to cause a split
+        tree.insert(ELEMENTS_PER_PAGE, ELEMENTS_PER_PAGE.to_string());
+
+        match &tree.root {
+            BranchNode(_) => {},
+            _ => panic!("Root should be a BranchNode after splitting"),
+        }
+    }
 }
