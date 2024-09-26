@@ -1,4 +1,5 @@
 use std::mem::swap;
+use log::warn;
 use crate::vector_b_tree::BranchChildType::{Branch, Leaf};
 use crate::vector_b_tree::TreeNode::{BranchNode, LeafNode, Null, OverflowNode};
 
@@ -13,7 +14,8 @@ type IndexType = usize;
 struct BranchItem {
     indexes: Vec<IndexType>,
     data: Vec<TreeNode>,
-    branch_type: BranchChildType
+    branch_type: BranchChildType,
+    num_leafs: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -56,6 +58,7 @@ impl BranchItem {
             indexes: vec![],
             data: vec![],
             branch_type: BranchChildType::Null,
+            num_leafs: 0,
         }
     }
 }
@@ -98,7 +101,7 @@ impl TreeNode {
                 }
             }
             BranchNode(branch) => {
-                println!("{}BranchNode({} Type, {} Index Len, {} Data Len):", indent, print_branch_type(&branch.branch_type), branch.indexes.len(), branch.data.len());
+                println!("{}BranchNode({} Type, {} Index Len, {} Data Len, {} Num Leaves):", indent, print_branch_type(&branch.branch_type), branch.indexes.len(), branch.data.len(), branch.num_leafs);
                 for (idx, child) in branch.indexes.iter().zip(branch.data.iter()) {
                     child.print(depth + 1);
                     println!("{}  {} ->", indent, idx);
@@ -152,7 +155,7 @@ fn branch_item_mitosis(mut node: BranchItem) -> TreeNode {
     node.data.reverse();
     left.branch_type = node.branch_type.clone();
     right.branch_type = node.branch_type;
-    
+
     let mut cur_idx = node.indexes.len();
     while let Some(idx) = node.indexes.pop() {
         let new_leaf = if cur_idx > midpt { &mut left } else { &mut right };
@@ -183,8 +186,10 @@ fn leaf_array_insertion(mut node: LeafItem, index: IndexType, data: DataType) ->
 }
 
 // Make sure we take ownership here, no borrowing.   <- this may not scale
-fn insert_into_leaf_node(node: LeafItem, index: IndexType, data: DataType) -> TreeNode {
-    if (node.indexes.contains(&index)) {
+fn insert_into_leaf_node(mut node: LeafItem, index: IndexType, data: DataType) -> TreeNode {
+    let idx = binary_search(&node.indexes, compare_index_type, &index);
+    if idx < node.indexes.len() && node.indexes[idx] == index {
+        node.data[idx] = data;
         LeafNode(node)
     } else if (node.indexes.len() >= ELEMENTS_PER_PAGE) {
         leaf_item_mitosis(
@@ -201,15 +206,28 @@ fn compare_index_type(left: &IndexType, right: &IndexType) -> bool {
     left < right
 }
 
-fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataType) -> TreeNode {
+fn get_num_leafs(x: &TreeNode) -> usize {
+    match x {
+        LeafNode(x) => {x.data.len()}
+        BranchNode(x) => {x.num_leafs}
+        _ => 0
+    }
+}
 
+
+fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataType) -> TreeNode {
     let idx = binary_search(&node.indexes, compare_index_type, &index);
-    
+
     let mut selected = Null;
     swap(&mut selected, &mut node.data[idx]);
-    let mut result = match insert_item(selected, index, data) {
+    println!("Num Leaves Node: {}", node.num_leafs);
+    println!("Num Leaves Edited: {}", get_num_leafs(&selected));
+    println!("{:?}", node);
+    node.num_leafs -= get_num_leafs(&selected);
+    let result = match insert_item(selected, index, data) {
         BranchNode(x) => {
             node.data[idx] = BranchNode(x);
+            node.num_leafs += get_num_leafs(&node.data[idx]);
             node
         }
         OverflowNode(left, new_index, right) => {
@@ -243,6 +261,7 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
         }
         LeafNode(x) => {
             node.data[idx] = LeafNode(x);
+            node.num_leafs += get_num_leafs(&node.data[idx]);
             node
         }
         _ => {panic!("And you may ask yourself 'How did I get here'")}
@@ -297,8 +316,9 @@ fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
 // Should this return reference or copy? TBD
 fn get_data(tree_node: &TreeNode, index: IndexType) -> Option<&DataType> {
     match tree_node {
-        LeafNode(x) => {
-           x.data.get(index)
+        LeafNode(x) => { 
+            let idx = binary_search(&x.indexes, compare_index_type, &index);
+            x.data.get(idx)
         }
         BranchNode(x) => {
             let arr_idx = binary_search(&x.indexes, compare_index_type, &index);
@@ -312,6 +332,9 @@ fn set_data(tree_node: &mut TreeNode, index: IndexType, data: DataType) -> bool 
     match tree_node {
         LeafNode(x) => {
             let arr_idx = binary_search(&x.indexes, compare_index_type, &index);
+            if arr_idx != index {
+                return false
+            }
             x.data[arr_idx] = data;
             true
         }
@@ -342,7 +365,7 @@ impl BTree {
         }
     }
 
-    pub fn insert(&mut self, index: IndexType, data: DataType) {
+    pub(crate) fn set_item(&mut self, index: IndexType, data: DataType) {
         let mut root_item = Null;
         swap(&mut self.root, &mut root_item);
         self.root = match insert_item(root_item, index, data) {
@@ -356,16 +379,21 @@ impl BTree {
                         BranchChildType::Null
                     }
                 };
+                new_branch.num_leafs += get_num_leafs(&l);
+                new_branch.num_leafs += get_num_leafs(&r);
                 new_branch.indexes.push(idx);
                 new_branch.data.push(*l);
                 new_branch.data.push(*r);
-                BranchNode(new_branch)
+                let wrapped = BranchNode(new_branch);
+                wrapped.print(0);
+                wrapped
             }
             x => {
                 x
             }
         };
-        self.num_elements +=1 ;
+        // Pre-Emptive Set is more optimal
+        self.num_elements = get_num_leafs(&self.root)
     }
 
     pub fn remove(&mut self, index: IndexType) {
@@ -376,17 +404,17 @@ impl BTree {
         get_data(&self.root, index)
     }
 
-    pub fn set_item(&mut self, index: IndexType, data: DataType) {
-        set_data(&mut self.root, index, data);
-    }
-
     pub fn print(&self) {
         println!("{}", "=".repeat(10));
         println!("BTree (num_elements: {}):", self.num_elements);
         self.root.print(0);
         println!("{}", "=".repeat(10));
     }
+    pub fn get_num_elements(&self) -> usize {
+        self.num_elements
+    }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -396,7 +424,7 @@ mod tests {
     #[test]
     fn test_new_btree() {
         let tree = BTree::new();
-        assert_eq!(tree.num_elements, 0);
+        assert_eq!(tree.get_num_elements(), 0);
         match tree.root {
             Null => {},
             _ => panic!("New BTree root should be Null"),
@@ -406,19 +434,19 @@ mod tests {
     #[test]
     fn test_insert_and_get_single_item() {
         let mut tree = BTree::new();
-        tree.insert(0, "Hello".to_string());
-        assert_eq!(tree.num_elements, 1);
+        tree.set_item(0, "Hello".to_string());
+        assert_eq!(tree.get_num_elements(), 1);
         assert_eq!(tree.get_item(0), Some(&"Hello".to_string()));
     }
 
     #[test]
     fn test_insert_and_get_multiple_items() {
         let mut tree = BTree::new();
-        tree.insert(0, "First".to_string());
-        tree.insert(1, "Second".to_string());
-        tree.insert(2, "Third".to_string());
+        tree.set_item(0, "First".to_string());
+        tree.set_item(1, "Second".to_string());
+        tree.set_item(2, "Third".to_string());
 
-        assert_eq!(tree.num_elements, 3);
+        assert_eq!(tree.get_num_elements(), 3);
         assert_eq!(tree.get_item(0), Some(&"First".to_string()));
         assert_eq!(tree.get_item(1), Some(&"Second".to_string()));
         assert_eq!(tree.get_item(2), Some(&"Third".to_string()));
@@ -427,17 +455,17 @@ mod tests {
     #[test]
     fn test_insert_overwrite() {
         let mut tree = BTree::new();
-        tree.insert(0, "Original".to_string());
-        tree.insert(0, "Overwritten".to_string());
+        tree.set_item(0, "Original".to_string());
+        tree.set_item(0, "Overwritten".to_string());
 
-        assert_eq!(tree.num_elements, 1);
+        assert_eq!(tree.get_num_elements(), 1);
         assert_eq!(tree.get_item(0), Some(&"Overwritten".to_string()));
     }
 
     #[test]
     fn test_get_nonexistent_item() {
         let mut tree = BTree::new();
-        tree.insert(0, "Exists".to_string());
+        tree.set_item(0, "Exists".to_string());
 
         assert_eq!(tree.get_item(1), None);
     }
@@ -445,10 +473,10 @@ mod tests {
     #[test]
     fn test_set_item() {
         let mut tree = BTree::new();
-        tree.insert(0, "Original".to_string());
+        tree.set_item(0, "Original".to_string());
         tree.set_item(0, "Updated".to_string());
 
-        assert_eq!(tree.num_elements, 1);
+        assert_eq!(tree.get_num_elements(), 1);
         assert_eq!(tree.get_item(0), Some(&"Updated".to_string()));
     }
 
@@ -457,37 +485,37 @@ mod tests {
         let mut tree = BTree::new();
         tree.set_item(0, "New".to_string());
 
-        assert_eq!(tree.num_elements, 1);
+        assert_eq!(tree.get_num_elements(), 1);
         assert_eq!(tree.get_item(0), Some(&"New".to_string()));
     }
 
     #[test]
     fn test_insert_large_index() {
         let mut tree = BTree::new();
-        tree.insert(1000000, "Large Index".to_string());
+        tree.set_item(1000000, "Large Index".to_string());
 
-        assert_eq!(tree.num_elements, 1);
+        assert_eq!(tree.get_num_elements(), 1);
         assert_eq!(tree.get_item(1000000), Some(&"Large Index".to_string()));
     }
 
     #[test]
     fn test_insert_and_get_empty_string() {
         let mut tree = BTree::new();
-        tree.insert(0, "".to_string());
+        tree.set_item(0, "".to_string());
 
-        assert_eq!(tree.num_elements, 1);
+        assert_eq!(tree.get_num_elements(), 1);
         assert_eq!(tree.get_item(0), Some(&"".to_string()));
     }
 
     #[test]
     fn test_multiple_operations() {
         let mut tree = BTree::new();
-        tree.insert(0, "Zero".to_string());
-        tree.insert(1, "One".to_string());
+        tree.set_item(0, "Zero".to_string());
+        tree.set_item(1, "One".to_string());
         tree.set_item(0, "Updated Zero".to_string());
-        tree.insert(2, "Two".to_string());
+        tree.set_item(2, "Two".to_string());
 
-        assert_eq!(tree.num_elements, 3);
+        assert_eq!(tree.get_num_elements(), 3);
         assert_eq!(tree.get_item(0), Some(&"Updated Zero".to_string()));
         assert_eq!(tree.get_item(1), Some(&"One".to_string()));
         assert_eq!(tree.get_item(2), Some(&"Two".to_string()));
@@ -497,10 +525,10 @@ mod tests {
     fn test_insert_and_get_1000_sequential_items() {
         let mut tree = BTree::new();
         for i in 0..1000 {
-            tree.insert(i, i.to_string());
+            tree.set_item(i, i.to_string());
         }
 
-        assert_eq!(tree.num_elements, 1000);
+        assert_eq!(tree.get_num_elements(), 1000);
         for i in 0..1000 {
             assert_eq!(tree.get_item(i), Some(&i.to_string()));
         }
@@ -510,10 +538,10 @@ mod tests {
     fn test_insert_and_get_1000_reverse_order_items() {
         let mut tree = BTree::new();
         for i in (0..1000).rev() {
-            tree.insert(i, i.to_string());
+            tree.set_item(i, i.to_string());
         }
 
-        assert_eq!(tree.num_elements, 1000);
+        assert_eq!(tree.get_num_elements(), 1000);
         for i in 0..1000 {
             assert_eq!(tree.get_item(i), Some(&i.to_string()));
         }
@@ -523,14 +551,14 @@ mod tests {
     fn test_insert_1000_items_and_overwrite() {
         let mut tree = BTree::new();
         for i in 0..1000 {
-            tree.insert(i, format!("Original {}", i));
+            tree.set_item(i, format!("Original {}", i));
         }
 
         for i in 0..1000 {
-            tree.insert(i, format!("Updated {}", i));
+            tree.set_item(i, format!("Updated {}", i));
         }
 
-        assert_eq!(tree.num_elements, 1000);
+        assert_eq!(tree.get_num_elements(), 1000);
         for i in 0..1000 {
             assert_eq!(tree.get_item(i), Some(&format!("Updated {}", i)));
         }
@@ -540,10 +568,10 @@ mod tests {
     fn test_insert_1000_items_with_gaps() {
         let mut tree = BTree::new();
         for i in 0..1000 {
-            tree.insert(i * 2, i.to_string());
+            tree.set_item(i * 2, i.to_string());
         }
 
-        assert_eq!(tree.num_elements, 1000);
+        assert_eq!(tree.get_num_elements(), 1000);
         for i in 0..1000 {
             assert_eq!(tree.get_item(i * 2), Some(&i.to_string()));
             assert_eq!(tree.get_item(i * 2 + 1), None);
@@ -554,14 +582,14 @@ mod tests {
     fn test_insert_and_update_1000_items() {
         let mut tree = BTree::new();
         for i in 0..1000 {
-            tree.insert(i, format!("Original {}", i));
+            tree.set_item(i, format!("Original {}", i));
         }
 
         for i in 0..1000 {
             tree.set_item(i, format!("Updated {}", i));
         }
 
-        assert_eq!(tree.num_elements, 1000);
+        assert_eq!(tree.get_num_elements(), 1000);
         for i in 0..1000 {
             assert_eq!(tree.get_item(i), Some(&format!("Updated {}", i)));
         }
@@ -575,10 +603,10 @@ mod tests {
 
         let mut tree = BTree::new();
         for &i in &indices {
-            tree.insert(i, i.to_string());
+            tree.set_item(i, i.to_string());
         }
 
-        assert_eq!(tree.num_elements, 1000);
+        assert_eq!(tree.get_num_elements(), 1000);
         for i in 0..1000 {
             assert_eq!(tree.get_item(i), Some(&i.to_string()));
         }
@@ -590,10 +618,10 @@ mod tests {
         let large_indices = [10000, 100000, 1000000, 10000000];
 
         for &index in &large_indices {
-            tree.insert(index, format!("Large {}", index));
+            tree.set_item(index, format!("Large {}", index));
         }
 
-        assert_eq!(tree.num_elements, large_indices.len());
+        assert_eq!(tree.get_num_elements(), large_indices.len());
         for &index in &large_indices {
             assert_eq!(tree.get_item(index), Some(&format!("Large {}", index)));
         }
@@ -603,7 +631,7 @@ mod tests {
     fn test_tree_structure() {
         let mut tree = BTree::new();
         for i in 0..20 {
-            tree.insert(i, i.to_string());
+            tree.set_item(i, i.to_string());
         }
 
         match &tree.root {
@@ -620,7 +648,7 @@ mod tests {
     fn test_leaf_node_capacity() {
         let mut tree = BTree::new();
         for i in 0..ELEMENTS_PER_PAGE {
-            tree.insert(i, i.to_string());
+            tree.set_item(i, i.to_string());
         }
 
         match &tree.root {
@@ -632,7 +660,7 @@ mod tests {
         }
 
         // Insert one more element to cause a split
-        tree.insert(ELEMENTS_PER_PAGE, ELEMENTS_PER_PAGE.to_string());
+        tree.set_item(ELEMENTS_PER_PAGE, ELEMENTS_PER_PAGE.to_string());
 
         match &tree.root {
             BranchNode(_) => {},
