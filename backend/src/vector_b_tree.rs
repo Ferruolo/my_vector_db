@@ -1,5 +1,4 @@
 use std::mem::swap;
-use log::warn;
 use crate::vector_b_tree::BranchChildType::{Branch, Leaf};
 use crate::vector_b_tree::TreeNode::{BranchNode, LeafNode, Null, OverflowNode};
 
@@ -19,7 +18,8 @@ struct BranchItem {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum BranchChildType { // Assert that all types are equal throughout the branch
+enum BranchChildType { 
+    // Assert that all types are equal throughout the branch
     Null,
     Leaf,
     Branch
@@ -102,11 +102,11 @@ impl TreeNode {
                 }
             }
             BranchNode(branch) => {
-                println!("{}BranchNode({} Type, {} Index Len, {} Data Len, {} Num Leaves):", 
-                         indent, 
-                         print_branch_type(&branch.branch_type), 
-                         branch.indexes.len(), 
-                         branch.data.len(), 
+                println!("{}BranchNode({} Type, {} Index Len, {} Data Len, {} Num Leaves):",
+                         indent,
+                         print_branch_type(&branch.branch_type),
+                         branch.indexes.len(),
+                         branch.data.len(),
                          branch.num_leafs
                 );
 
@@ -182,7 +182,7 @@ fn branch_item_mitosis(mut node: BranchItem) -> TreeNode {
 
     // This might be a bad assumption, tbd
     let new_midpt = left.indexes.pop().unwrap();
-    
+
     OverflowNode(Box::new(BranchNode(left)), new_midpt, Box::new(BranchNode(right)))
 }
 
@@ -200,7 +200,7 @@ fn insert_into_leaf_node(mut node: LeafItem, index: IndexType, data: DataType) -
     if idx < node.indexes.len() && node.indexes[idx] == index {
         node.data[idx] = data;
         LeafNode(node)
-    } else if (node.indexes.len() >= ELEMENTS_PER_PAGE) {
+    } else if node.indexes.len() >= ELEMENTS_PER_PAGE {
         leaf_item_mitosis(
             node,
             index,
@@ -253,12 +253,12 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
                     // Oh how I hate to code imperatively (jk I'm too dumb not to)
                     node.data[left_idx] =  LeafNode(l);
                     node.data.insert(left_idx + 1, LeafNode(r));
-                    
+
                     node
                 }
                 (BranchNode(l), BranchNode(r)) => {
                     match node.branch_type {
-                        BranchChildType::Branch => {()} // Null Op for Enum
+                        Branch => {()} // Null Op for Enum
                         _ => {panic!("Wrong Type of merge here????!!")}
                     }
 
@@ -309,24 +309,6 @@ fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
     }
 }
 
-// fn delete_item(node: TreeNode, index: IndexType) -> TreeNode {
-//     match node {
-//         LeafNode(_) => { Null }
-//         BranchNode(x) => {
-//             let arr_idx = binary_search(&x.indexes, compare_index_type, &index);
-//             let mut delete_path = Null;
-//             swap(&mut delete_path, &mut x.data[arr_idx]); // This is NOT FUNCTIONAL
-//             // I don't know why you'd commit to that ^
-//             x.data[arr_idx] = delete_item(delete_path, index);
-//
-//             BranchNode(x)
-//         }
-//         Null => { Null }
-//         _ => panic!("This should not happen")
-//     }
-// }
-
-
 // Should this return reference or copy? TBD
 fn get_data(tree_node: &TreeNode, index: IndexType) -> Option<&DataType> {
     match tree_node {
@@ -370,8 +352,8 @@ impl BTree {
             OverflowNode(l, idx, r) => {
                 let mut new_branch = BranchItem::new();
                 new_branch.branch_type = match &*l {
-                    LeafNode(_) => {BranchChildType::Leaf}
-                    BranchNode(_) => {BranchChildType::Branch}
+                    LeafNode(_) => {Leaf}
+                    BranchNode(_) => {Branch}
                     OverflowNode(_, _, _) => {BranchChildType::Null}
                     Null => {
                         BranchChildType::Null
