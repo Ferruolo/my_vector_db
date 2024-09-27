@@ -1,3 +1,4 @@
+use std::cmp::{max, min};
 use std::mem::swap;
 use crate::vector_b_tree::BranchChildType::{Branch, Leaf};
 use crate::vector_b_tree::TreeNode::{BranchNode, LeafNode, Null, OverflowNode};
@@ -293,7 +294,7 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
 */
 fn delete_from_leaf_node(mut node: LeafItem, index: IndexType) -> TreeNode {
     let idx = binary_search(&node.indexes, compare_index_type, &index);
-    if (node.indexes[idx] == index) {
+    if idx < node.indexes.len() && node.indexes[idx] == index {
         node.indexes.remove(idx);
         node.data.remove(idx);
     }
@@ -325,7 +326,18 @@ fn delete_from_branch_node(mut node: BranchItem, index: IndexType) -> TreeNode {
             node.num_leafs += get_num_leafs(&node.data[idx]);
             BranchNode(node)
         }
-        x => {x}
+        Null => {
+            node.data.remove(idx);
+            node.indexes.remove(min(idx, max(0, node.indexes.len() - 1)));
+            if node.num_leafs > 0 {
+                BranchNode(node)
+            } else {
+                Null
+            }
+        }
+        _ => {
+            Null
+        }
     }
 }
 
@@ -467,6 +479,7 @@ impl BTree {
         let mut root = Null;
         swap(&mut self.root, &mut root);
         self.root = delete_item(root, index);
+        self.num_elements = get_num_leafs(&self.root)
     }
 
     pub fn get_item(&mut self, index: IndexType) -> Option<&DataType> {
@@ -850,12 +863,11 @@ mod tests {
         let mut tree = BTree::new();
         let mut rng = rand::thread_rng();
         let mut indices: Vec<usize> = (0..1000).collect();
-
+        indices.shuffle(&mut rng);
         for i in 0..1000 {
             tree.set_item(i, i.to_string());
         }
 
-        indices.shuffle(&mut rng);
 
         for &i in &indices {
             tree.remove(i);
