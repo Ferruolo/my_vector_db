@@ -297,7 +297,12 @@ fn delete_from_leaf_node(mut node: LeafItem, index: IndexType) -> TreeNode {
         node.indexes.remove(idx);
         node.data.remove(idx);
     }
-    LeafNode(node)
+
+    if node.indexes.is_empty() {
+        Null
+    } else {
+        LeafNode(node)
+    }
 }
 
 fn delete_from_branch_node(mut node: BranchItem, index: IndexType) -> TreeNode {
