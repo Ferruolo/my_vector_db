@@ -18,7 +18,7 @@ struct BranchItem {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum BranchChildType { 
+enum BranchChildType {
     // Assert that all types are equal throughout the branch
     Null,
     Leaf,
@@ -287,6 +287,71 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
     }
 }
 
+
+/*
+ * Delete Helper Functions
+*/
+fn delete_from_leaf_node(mut node: LeafItem, index: IndexType) -> TreeNode {
+    let idx = binary_search(&node.indexes, compare_index_type, &index);
+    if (node.indexes[idx] == index) {
+        node.indexes.remove(idx);
+        node.data.remove(idx);
+    }
+    LeafNode(node)
+}
+
+fn delete_from_branch_node(mut node: BranchItem, index: IndexType) -> TreeNode {
+    let idx = binary_search(&node.indexes, compare_index_type, &index);
+    let mut selected = Null;
+    swap(&mut selected, &mut node.data[idx]);
+    node.num_leafs -= get_num_leafs(&selected);
+    match delete_item(selected, index) {
+        LeafNode(x) => {
+            node.data[idx] = LeafNode(x);
+            node.num_leafs += get_num_leafs(&node.data[idx]);
+            if node.num_leafs < ELEMENTS_PER_PAGE { // Merge Leafs
+                merge_leafs(node)
+            } else {
+                BranchNode(node)
+            }
+        }
+        BranchNode(x) => {
+            node.data[idx] = BranchNode(x);
+            node.num_leafs += get_num_leafs(&node.data[idx]);
+            BranchNode(node)
+        }
+        x => {x}
+    }
+}
+
+fn merge_leafs(node: BranchItem) -> TreeNode {
+    if node.num_leafs == 0 {
+        return Null
+    }
+    
+    let mut leaf = LeafItem::new();
+    
+    for item in node.data {
+        match item {
+            LeafNode(x) => {
+                let mut data = x.data;
+                let mut indexes = x.indexes;
+                indexes.reverse();
+                data.reverse();
+                while let Some(d) = data.pop() {
+                    leaf.data.push(d);
+                }
+                while let Some(i) = indexes.pop() {
+                    leaf.indexes.push(i);
+                }
+            }
+            _ => {
+                panic!("Non leaf Node in weird place");
+            }
+        }
+    }
+    LeafNode(leaf)
+}
 /*
  * Base Functions
 */
@@ -309,8 +374,9 @@ fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
     }
 }
 
-// Should this return reference or copy? TBD
+
 fn get_data(tree_node: &TreeNode, index: IndexType) -> Option<&DataType> {
+    // Should this return reference or copy? TBD
     match tree_node {
         LeafNode(x) => { 
             let idx = binary_search(&x.indexes, compare_index_type, &index);
@@ -327,6 +393,24 @@ fn get_data(tree_node: &TreeNode, index: IndexType) -> Option<&DataType> {
         _ => None,
     }
 }
+
+
+fn delete_item(tree_node: TreeNode, index: IndexType) -> TreeNode {
+    // We currently have 0 idea if this works or not
+    match tree_node {
+        LeafNode(node) => {
+            delete_from_leaf_node(node, index)
+        }
+        BranchNode(
+            node
+        ) => {
+            delete_from_branch_node(node, index)
+        }
+        _ => {Null}
+    }
+    
+}
+
 
 /*
  *  Wrapper!
@@ -375,7 +459,9 @@ impl BTree {
     }
 
     pub fn remove(&mut self, index: IndexType) {
-        todo!("Haven't Implemented Delete Yet")
+        let mut root = Null;
+        swap(&mut self.root, &mut root);
+        self.root = delete_item(root, index);
     }
 
     pub fn get_item(&mut self, index: IndexType) -> Option<&DataType> {
