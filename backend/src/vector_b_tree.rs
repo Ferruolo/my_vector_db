@@ -736,4 +736,167 @@ mod tests {
             _ => panic!("Root should be a BranchNode after splitting"),
         }
     }
+
+    #[test]
+    fn test_delete_single_item() {
+        let mut tree = BTree::new();
+        tree.set_item(0, "Hello".to_string());
+        tree.remove(0);
+        assert_eq!(tree.get_num_elements(), 0);
+        assert_eq!(tree.get_item(0), None);
+    }
+
+    #[test]
+    fn test_delete_nonexistent_item() {
+        let mut tree = BTree::new();
+        tree.set_item(0, "Exists".to_string());
+        tree.remove(1);
+        assert_eq!(tree.get_num_elements(), 1);
+        assert_eq!(tree.get_item(0), Some(&"Exists".to_string()));
+    }
+
+    #[test]
+    fn test_delete_multiple_items() {
+        let mut tree = BTree::new();
+        tree.set_item(0, "First".to_string());
+        tree.set_item(1, "Second".to_string());
+        tree.set_item(2, "Third".to_string());
+
+        tree.remove(1);
+        assert_eq!(tree.get_num_elements(), 2);
+        assert_eq!(tree.get_item(0), Some(&"First".to_string()));
+        assert_eq!(tree.get_item(1), None);
+        assert_eq!(tree.get_item(2), Some(&"Third".to_string()));
+
+        tree.remove(0);
+        assert_eq!(tree.get_num_elements(), 1);
+        assert_eq!(tree.get_item(0), None);
+        assert_eq!(tree.get_item(2), Some(&"Third".to_string()));
+    }
+
+    #[test]
+    fn test_delete_and_reinsert() {
+        let mut tree = BTree::new();
+        tree.set_item(0, "Original".to_string());
+        tree.remove(0);
+        tree.set_item(0, "Reinserted".to_string());
+
+        assert_eq!(tree.get_num_elements(), 1);
+        assert_eq!(tree.get_item(0), Some(&"Reinserted".to_string()));
+    }
+
+    #[test]
+    fn test_delete_from_leaf_node() {
+        let mut tree = BTree::new();
+        for i in 0..ELEMENTS_PER_PAGE {
+            tree.set_item(i, i.to_string());
+        }
+
+        tree.remove(ELEMENTS_PER_PAGE - 1);
+        assert_eq!(tree.get_num_elements(), ELEMENTS_PER_PAGE - 1);
+        assert_eq!(tree.get_item(ELEMENTS_PER_PAGE - 1), None);
+    }
+
+    #[test]
+    fn test_delete_causing_merge() {
+        let mut tree = BTree::new();
+        for i in 0..ELEMENTS_PER_PAGE * 2 {
+            tree.set_item(i, i.to_string());
+        }
+
+        // Delete items to cause a merge
+        for i in 0..ELEMENTS_PER_PAGE {
+            tree.remove(i);
+        }
+
+        assert_eq!(tree.get_num_elements(), ELEMENTS_PER_PAGE);
+        for i in ELEMENTS_PER_PAGE..ELEMENTS_PER_PAGE * 2 {
+            assert_eq!(tree.get_item(i), Some(&i.to_string()));
+        }
+    }
+
+    #[test]
+    fn test_delete_1000_items_sequential() {
+        let mut tree = BTree::new();
+        for i in 0..1000 {
+            tree.set_item(i, i.to_string());
+        }
+
+        for i in 0..1000 {
+            tree.remove(i);
+            assert_eq!(tree.get_item(i), None);
+        }
+
+        assert_eq!(tree.get_num_elements(), 0);
+    }
+
+    #[test]
+    fn test_delete_1000_items_reverse_order() {
+        let mut tree = BTree::new();
+        for i in 0..1000 {
+            tree.set_item(i, i.to_string());
+        }
+
+        for i in (0..1000).rev() {
+            tree.remove(i);
+            assert_eq!(tree.get_item(i), None);
+        }
+
+        assert_eq!(tree.get_num_elements(), 0);
+    }
+
+    #[test]
+    fn test_delete_1000_items_random_order() {
+        let mut tree = BTree::new();
+        let mut rng = rand::thread_rng();
+        let mut indices: Vec<usize> = (0..1000).collect();
+
+        for i in 0..1000 {
+            tree.set_item(i, i.to_string());
+        }
+
+        indices.shuffle(&mut rng);
+
+        for &i in &indices {
+            tree.remove(i);
+            assert_eq!(tree.get_item(i), None);
+        }
+
+        assert_eq!(tree.get_num_elements(), 0);
+    }
+
+    #[test]
+    fn test_delete_and_reinsert_1000_items() {
+        let mut tree = BTree::new();
+        for i in 0..1000 {
+            tree.set_item(i, format!("Original {}", i));
+        }
+
+        for i in 0..1000 {
+            tree.remove(i);
+            tree.set_item(i, format!("Reinserted {}", i));
+        }
+
+        assert_eq!(tree.get_num_elements(), 1000);
+        for i in 0..1000 {
+            assert_eq!(tree.get_item(i), Some(&format!("Reinserted {}", i)));
+        }
+    }
+
+    #[test]
+    fn test_delete_large_indices() {
+        let mut tree = BTree::new();
+        let large_indices = [10000, 100000, 1000000, 10000000];
+
+        for &index in &large_indices {
+            tree.set_item(index, format!("Large {}", index));
+        }
+
+        for &index in &large_indices {
+            tree.remove(index);
+            assert_eq!(tree.get_item(index), None);
+        }
+
+        assert_eq!(tree.get_num_elements(), 0);
+    }
 }
