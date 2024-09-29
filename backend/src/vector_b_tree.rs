@@ -1,7 +1,7 @@
-use std::cmp::{max, min};
-use std::mem::swap;
 use crate::vector_b_tree::BranchChildType::{Branch, Leaf};
 use crate::vector_b_tree::TreeNode::{BranchNode, LeafNode, Null, OverflowNode};
+use std::cmp::min;
+use std::mem::swap;
 
 const ELEMENTS_PER_PAGE: usize = 4;
 
@@ -327,8 +327,20 @@ fn delete_from_branch_node(mut node: BranchItem, index: IndexType) -> TreeNode {
             BranchNode(node)
         }
         Null => {
+            if node.num_leafs == 0 || node.indexes.len() == 0 || node.data.len() ==0 {
+                return Null;
+            }
+            
             node.data.remove(idx);
-            node.indexes.remove(min(idx, max(0, node.indexes.len() - 1)));
+            node.indexes.remove(
+                min(idx,
+                    if !node.indexes.is_empty() { 
+                        node.indexes.len() - 1 
+                    } else {
+                        0 
+                    }
+                )
+            );
             if node.num_leafs > 0 {
                 BranchNode(node)
             } else {
@@ -341,32 +353,51 @@ fn delete_from_branch_node(mut node: BranchItem, index: IndexType) -> TreeNode {
     }
 }
 
-fn merge_leafs(node: BranchItem) -> TreeNode {
+fn copy_leaf_node_data_over(source: LeafItem, target: &mut LeafItem) {
+    //  Note that we take ownership to ensure that source is dropped after
+    let mut data = source.data;
+    let mut indexes = source.indexes;
+    indexes.reverse();
+    data.reverse();
+    while let Some(d) = data.pop() {
+        target.data.push(d);
+    }
+    while let Some(i) = indexes.pop() {
+        target.indexes.push(i);
+    }
+}
+
+
+
+fn merge_leafs(mut node: BranchItem) -> TreeNode {
     if node.num_leafs == 0 {
         return Null
     }
     
     let mut leaf = LeafItem::new();
     
-    for item in node.data {
+    node.data.reverse();
+    
+    while let Some(item) = node.data.pop() {
         match item {
             LeafNode(x) => {
-                let mut data = x.data;
-                let mut indexes = x.indexes;
-                indexes.reverse();
-                data.reverse();
-                while let Some(d) = data.pop() {
-                    leaf.data.push(d);
-                }
-                while let Some(i) = indexes.pop() {
-                    leaf.indexes.push(i);
+                copy_leaf_node_data_over(x, &mut leaf);
+            }
+            BranchNode(x) => {
+                match merge_leafs(x) {
+                    LeafNode(x) => {
+                        copy_leaf_node_data_over(x, &mut leaf);
+                    }
+                    _ => {panic!("Merge Leafs returned wrong type (idk how)")}
                 }
             }
             _ => {
+                
                 panic!("Non leaf Node in weird place");
             }
         }
     }
+    //Edge Case: Maybe this passes over the limit?
     LeafNode(leaf)
 }
 /*
