@@ -1,9 +1,11 @@
 use crate::vector_b_tree::BranchChildType::{Branch, Leaf};
 use crate::vector_b_tree::TreeNode::{BranchNode, LeafNode, Null, OverflowNode};
-use std::cmp::min;
+use std::cmp::{max, min};
 use std::mem::swap;
 
 const ELEMENTS_PER_PAGE: usize = 4;
+const MAX_LIVE_PAGES: usize = 8;
+
 
 type DataType = String;
 type IndexType = usize;
@@ -16,6 +18,7 @@ struct BranchItem {
     data: Vec<TreeNode>,
     branch_type: BranchChildType,
     num_leafs: usize,
+    max_depth: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -61,6 +64,7 @@ impl BranchItem {
             data: vec![],
             branch_type: BranchChildType::Null,
             num_leafs: 0,
+            max_depth: 0,
         }
     }
 }
@@ -69,6 +73,7 @@ impl BranchItem {
 struct LeafItem {
     indexes: Vec<IndexType>,
     data: Vec<DataType>,
+    max_depth: usize,
 }
 
 impl LeafItem {
@@ -76,6 +81,7 @@ impl LeafItem {
         Self {
             indexes: vec![],
             data: vec![],
+            max_depth: 0
         }
     }
 }
@@ -90,6 +96,18 @@ enum TreeNode {
 
 fn find_midpoint(a: &IndexType, b: &IndexType) -> IndexType {
     (a + b + 1).div_ceil(2)
+}
+
+fn get_max_depth(tree_node: TreeNode) -> usize {
+    match tree_node {
+        LeafNode(x) => {
+            x.max_depth
+        }
+        BranchNode(x) => {
+            x.max_depth
+        }
+        _ => 0
+    }
 }
 
 impl TreeNode {
@@ -236,8 +254,10 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
     node.num_leafs -= get_num_leafs(&selected);
     let result = match insert_item(selected, index, data) {
         BranchNode(x) => {
+            node.max_depth = max(node.max_depth, x.max_depth);
             node.data[idx] = BranchNode(x);
             node.num_leafs += get_num_leafs(&node.data[idx]);
+            
             node
         }
         OverflowNode(left, new_index, right) => {
@@ -252,6 +272,7 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
                     let left_idx = binary_search(&node.indexes, compare_index_type, &new_index);
                     node.indexes.insert(left_idx, new_index);
                     // Oh how I hate to code imperatively (jk I'm too dumb not to)
+                    node.max_depth = max(node.max_depth, max(l.max_depth + 1, r.max_depth + 1));
                     node.data[left_idx] =  LeafNode(l);
                     node.data.insert(left_idx + 1, LeafNode(r));
 
@@ -266,9 +287,10 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
                     let left_idx = binary_search(&node.indexes, compare_index_type, &new_index);
                     node.indexes.insert(left_idx, new_index);
                     // Oh how I hate to code imperatively (jk I'm too dumb not to)
+                    node.max_depth = max(node.max_depth, max(l.max_depth + 1, r.max_depth) + 1);
                     node.data[left_idx] =  BranchNode(l);
                     node.data.insert(left_idx + 1, BranchNode(r));
-
+                    
                     node
                 }
                 _ => {panic!("And you may ask yourself 'How did I get here'")}                
@@ -466,7 +488,9 @@ fn delete_item(tree_node: TreeNode, index: IndexType) -> TreeNode {
 
 pub struct BTree {
     root: TreeNode,
-    num_elements: usize
+    num_elements: usize,
+    num_live_pages: usize,
+    max_depth: usize
 }
 
 impl BTree {
@@ -474,6 +498,8 @@ impl BTree {
         Self {
             root: Null,
             num_elements: 0,
+            num_live_pages: 0,
+            max_depth: 0
         }
     }
 
@@ -503,7 +529,8 @@ impl BTree {
             }
         };
         // Pre-Emptive Set is more optimal
-        self.num_elements = get_num_leafs(&self.root)
+        self.num_elements = get_num_leafs(&self.root);
+        self.max_depth = get_max_depth(self.root);
     }
 
     pub fn remove(&mut self, index: IndexType) {

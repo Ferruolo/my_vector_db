@@ -12,14 +12,13 @@ fn main() {
     let seed: u64 = rand::thread_rng().gen();
     println!("Using seed: {}", seed);
     let mut rng = StdRng::seed_from_u64(seed);
-    let mut indices: Vec<usize> = (0..1000).collect();
+    let mut indices: Vec<usize> = (0..1000000).collect();
     indices.shuffle(&mut rng);
-    for i in 0..1000 {
+    for i in 0..1000000 {
         tree.set_item(i, i.to_string());
     }
-
+    indices.shuffle(&mut rng);
     for (count, &i) in indices.iter().enumerate() {
-        println!("Removal {}: Item {}", count + 1, i);
         tree.remove(i);
         assert_eq!(tree.get_item(i), None);
     }
