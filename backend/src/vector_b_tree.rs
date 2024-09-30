@@ -98,7 +98,7 @@ fn find_midpoint(a: &IndexType, b: &IndexType) -> IndexType {
     (a + b + 1).div_ceil(2)
 }
 
-fn get_max_depth(tree_node: TreeNode) -> usize {
+fn get_max_depth(tree_node: &TreeNode) -> usize {
     match tree_node {
         LeafNode(x) => {
             x.max_depth
@@ -337,6 +337,7 @@ fn delete_from_branch_node(mut node: BranchItem, index: IndexType) -> TreeNode {
         LeafNode(x) => {
             node.data[idx] = LeafNode(x);
             node.num_leafs += get_num_leafs(&node.data[idx]);
+            node.max_depth = node.data.iter().map(|x| {get_max_depth(x) }).max().unwrap();
             if node.num_leafs < ELEMENTS_PER_PAGE { // Merge Leafs
                 merge_leafs(node)
             } else {
@@ -346,6 +347,7 @@ fn delete_from_branch_node(mut node: BranchItem, index: IndexType) -> TreeNode {
         BranchNode(x) => {
             node.data[idx] = BranchNode(x);
             node.num_leafs += get_num_leafs(&node.data[idx]);
+            node.max_depth = node.data.iter().map(|x| {get_max_depth(x) }).max().unwrap();
             BranchNode(node)
         }
         Null => {
@@ -422,6 +424,7 @@ fn merge_leafs(mut node: BranchItem) -> TreeNode {
     //Edge Case: Maybe this passes over the limit?
     LeafNode(leaf)
 }
+
 /*
  * Base Functions
 */
@@ -530,7 +533,7 @@ impl BTree {
         };
         // Pre-Emptive Set is more optimal
         self.num_elements = get_num_leafs(&self.root);
-        self.max_depth = get_max_depth(self.root);
+        self.max_depth = get_max_depth(&self.root);
     }
 
     pub fn remove(&mut self, index: IndexType) {
@@ -552,6 +555,10 @@ impl BTree {
     }
     pub fn get_num_elements(&self) -> usize {
         self.num_elements
+    }
+
+    pub fn get_depth(&self) -> usize {
+        self.max_depth
     }
 }
 
@@ -968,5 +975,101 @@ mod tests {
         }
 
         assert_eq!(tree.get_num_elements(), 0);
+    }
+
+
+    #[test]
+    fn test_empty_tree_depth() {
+        let tree = BTree::new();
+        assert_eq!(tree.max_depth, 0);
+    }
+
+    #[test]
+    fn test_single_item_depth() {
+        let mut tree = BTree::new();
+        tree.set_item(0, "Hello".to_string());
+        assert_eq!(tree.max_depth, 1);
+    }
+
+    #[test]
+    fn test_multiple_items_same_leaf_depth() {
+        let mut tree = BTree::new();
+        for i in 0..ELEMENTS_PER_PAGE {
+            tree.set_item(i, i.to_string());
+        }
+        assert_eq!(tree.max_depth, 1);
+    }
+
+    #[test]
+    fn test_depth_after_split() {
+        let mut tree = BTree::new();
+        for i in 0..=ELEMENTS_PER_PAGE {
+            tree.set_item(i, i.to_string());
+        }
+        assert_eq!(tree.max_depth, 2);
+    }
+
+    #[test]
+    fn test_depth_multiple_splits() {
+        let mut tree = BTree::new();
+        for i in 0..100 {
+            tree.set_item(i, i.to_string());
+        }
+        assert!(tree.max_depth > 2);
+    }
+
+    #[test]
+    fn test_depth_after_delete() {
+        let mut tree = BTree::new();
+        for i in 0..100 {
+            tree.set_item(i, i.to_string());
+        }
+        let depth_before = tree.max_depth;
+
+        for i in 0..50 {
+            tree.remove(i);
+        }
+
+        assert!(tree.max_depth <= depth_before);
+    }
+
+    #[test]
+    fn test_depth_large_tree() {
+        let mut tree = BTree::new();
+        for i in 0..10000 {
+            tree.set_item(i, i.to_string());
+        }
+        assert!(tree.max_depth > 3);
+    }
+
+    #[test]
+    fn test_depth_random_inserts_and_deletes() {
+        let mut tree = BTree::new();
+        let mut rng = rand::thread_rng();
+
+        // Insert 1000 random items
+        for _ in 0..1000 {
+            let key = rng.gen_range(0..10000);
+            tree.set_item(key, key.to_string());
+        }
+
+        let depth_after_inserts = tree.max_depth;
+
+        // Delete 500 random items
+        for _ in 0..500 {
+            let key = rng.gen_range(0..10000);
+            tree.remove(key);
+        }
+
+        assert!(tree.max_depth <= depth_after_inserts);
+    }
+
+    #[test]
+    fn test_depth_consistency() {
+        let mut tree = BTree::new();
+        for i in 0..1000 {
+            tree.set_item(i, i.to_string());
+            assert_eq!(tree.max_depth, get_max_depth(&tree.root));
+        }
     }
 }
