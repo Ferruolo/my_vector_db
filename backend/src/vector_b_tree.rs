@@ -101,7 +101,7 @@ fn find_midpoint(a: &IndexType, b: &IndexType) -> IndexType {
 fn get_max_depth(tree_node: &TreeNode) -> usize {
     match tree_node {
         LeafNode(x) => {
-            x.max_depth
+            1
         }
         BranchNode(x) => {
             x.max_depth
@@ -254,10 +254,9 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
     node.num_leafs -= get_num_leafs(&selected);
     let result = match insert_item(selected, index, data) {
         BranchNode(x) => {
-            node.max_depth = max(node.max_depth, x.max_depth);
             node.data[idx] = BranchNode(x);
             node.num_leafs += get_num_leafs(&node.data[idx]);
-            
+            node.max_depth = node.data.iter().map(|x| {get_max_depth(x)}).max().unwrap() + 1;
             node
         }
         OverflowNode(left, new_index, right) => {
@@ -272,7 +271,7 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
                     let left_idx = binary_search(&node.indexes, compare_index_type, &new_index);
                     node.indexes.insert(left_idx, new_index);
                     // Oh how I hate to code imperatively (jk I'm too dumb not to)
-                    node.max_depth = max(node.max_depth, max(l.max_depth + 1, r.max_depth + 1));
+                    node.max_depth =  node.data.iter().map(|x| {get_max_depth(x)}).max().unwrap() + 1;
                     node.data[left_idx] =  LeafNode(l);
                     node.data.insert(left_idx + 1, LeafNode(r));
 
@@ -287,9 +286,12 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
                     let left_idx = binary_search(&node.indexes, compare_index_type, &new_index);
                     node.indexes.insert(left_idx, new_index);
                     // Oh how I hate to code imperatively (jk I'm too dumb not to)
-                    node.max_depth = max(node.max_depth, max(l.max_depth + 1, r.max_depth) + 1);
-                    node.data[left_idx] =  BranchNode(l);
-                    node.data.insert(left_idx + 1, BranchNode(r));
+                    let wrapped_l = BranchNode(l);
+                    let wrapped_r = BranchNode(r);
+                    
+                    node.max_depth = node.data.iter().map(|x| {get_max_depth(x)}).max().unwrap() + 1;
+                    node.data[left_idx] =  wrapped_l;
+                    node.data.insert(left_idx + 1, wrapped_r);
                     
                     node
                 }
@@ -469,7 +471,6 @@ fn get_data(tree_node: &TreeNode, index: IndexType) -> Option<&DataType> {
 
 
 fn delete_item(tree_node: TreeNode, index: IndexType) -> TreeNode {
-    // We currently have 0 idea if this works or not
     match tree_node {
         LeafNode(node) => {
             delete_from_leaf_node(node, index)
@@ -493,7 +494,7 @@ pub struct BTree {
     root: TreeNode,
     num_elements: usize,
     num_live_pages: usize,
-    max_depth: usize
+    pub(crate) max_depth: usize
 }
 
 impl BTree {
@@ -523,6 +524,7 @@ impl BTree {
                 new_branch.num_leafs += get_num_leafs(&l);
                 new_branch.num_leafs += get_num_leafs(&r);
                 new_branch.indexes.push(idx);
+                new_branch.max_depth = max(get_max_depth(&l), get_max_depth(&r)) + 1;
                 new_branch.data.push(*l);
                 new_branch.data.push(*r);
                 BranchNode(new_branch)
@@ -565,6 +567,7 @@ impl BTree {
 
 #[cfg(test)]
 mod tests {
+    use rand::Rng;
     use super::*;
     use rand::seq::SliceRandom;
 
@@ -976,8 +979,7 @@ mod tests {
 
         assert_eq!(tree.get_num_elements(), 0);
     }
-
-
+    
     #[test]
     fn test_empty_tree_depth() {
         let tree = BTree::new();
@@ -1003,7 +1005,7 @@ mod tests {
     #[test]
     fn test_depth_after_split() {
         let mut tree = BTree::new();
-        for i in 0..=ELEMENTS_PER_PAGE {
+        for i in 0..(ELEMENTS_PER_PAGE + 1) {
             tree.set_item(i, i.to_string());
         }
         assert_eq!(tree.max_depth, 2);
