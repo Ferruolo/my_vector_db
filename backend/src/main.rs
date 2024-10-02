@@ -13,6 +13,6 @@ fn main() {
         tree.set_item(i, i.to_string());
     }
     println!("Max Depth {}", tree.max_depth);
-    // tree.print();
+
     assert!(tree.max_depth > 3);
 }

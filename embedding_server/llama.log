@@ -1,0 +1,31 @@
+[1727905014] 
+llama server listening at http://127.0.0.1:8080
+
+[1727905017] warming up the model with an empty run
+[1727905017] Available slots:
+[1727905017]  -> Slot 0 - max context: 32768
+[1727905017] all slots are idle and system prompt is empty, clear the KV cache
+[1727905021] slot 0 is processing [task id: 1]
+[1727905021] slot 0 : kv cache rm - [0, end)
+[1727905021] slot 0 released (6 tokens in cache)
+[1727905021] slot 0 is processing [task id: 2]
+[1727905021] slot 0 : kv cache rm - [0, end)
+[1727905022] slot 0 released (5 tokens in cache)
+[1727905022] slot 0 is processing [task id: 0]
+[1727905022] slot 0 : kv cache rm - [0, end)
+[1727905022] slot 0 released (10 tokens in cache)
+[1727905022] slot 0 is processing [task id: 8]
+[1727905022] slot 0 : kv cache rm - [0, end)
+[1727905023] slot 0 released (17 tokens in cache)
+[1727905033] slot 0 is processing [task id: 13]
+[1727905033] slot 0 : kv cache rm - [0, end)
+[1727905033] slot 0 released (6 tokens in cache)
+[1727905033] slot 0 is processing [task id: 14]
+[1727905033] slot 0 : kv cache rm - [0, end)
+[1727905033] slot 0 released (5 tokens in cache)
+[1727905033] slot 0 is processing [task id: 12]
+[1727905033] slot 0 : kv cache rm - [0, end)
+[1727905034] slot 0 released (10 tokens in cache)
+[1727905034] slot 0 is processing [task id: 20]
+[1727905034] slot 0 : kv cache rm - [0, end)
+[1727905035] slot 0 released (17 tokens in cache)
