@@ -1,4 +1,4 @@
-use crate::vector_b_tree::BranchChildType::{Branch, Leaf};
+use crate::vector_b_tree::dtype::{Branch, Leaf};
 use crate::vector_b_tree::TreeNode::{BranchNode, LeafNode, Null, OverflowNode};
 use std::cmp::{max, min};
 use std::mem::swap;
@@ -9,20 +9,19 @@ const MAX_LIVE_PAGES: usize = 8;
 
 type DataType = String;
 type IndexType = usize;
-// Beautiful, functional code. Amazing, except it isn't totally functional (yet)
 
 // Can we combine these two similar items?
 #[derive(Debug)]
 struct BranchItem {
     indexes: Vec<IndexType>,
     data: Vec<TreeNode>,
-    branch_type: BranchChildType,
+    branch_type: dtype,
     num_leafs: usize,
     max_depth: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum BranchChildType {
+enum dtype {
     // Assert that all types are equal throughout the branch
     Null,
     Leaf,
@@ -30,9 +29,9 @@ enum BranchChildType {
 }
 
 
-fn print_branch_type(x: &BranchChildType) -> String {
+fn print_branch_type(x: &dtype) -> String {
     match x {
-        BranchChildType::Null => { "NULL".parse().unwrap() }
+        dtype::Null => { "NULL".parse().unwrap() }
         Leaf => { "LEAF".parse().unwrap() }
         Branch => { "BRANCH".parse().unwrap() }
     }
@@ -62,7 +61,7 @@ impl BranchItem {
         Self {
             indexes: vec![],
             data: vec![],
-            branch_type: BranchChildType::Null,
+            branch_type: dtype::Null,
             num_leafs: 0,
             max_depth: 0,
         }
@@ -91,8 +90,15 @@ enum TreeNode {
     LeafNode(LeafItem),
     BranchNode(BranchItem),
     OverflowNode(Box<TreeNode>, IndexType, Box<TreeNode>),
-    Null,
+    Null
 }
+
+
+struct DiskItem {
+    file_path: String,
+    dtype: dtype
+}
+
 
 fn find_midpoint(a: &IndexType, b: &IndexType) -> IndexType {
     (a + b + 1).div_ceil(2)
@@ -312,7 +318,6 @@ fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataTyp
     }
 }
 
-
 /*
  * Delete Helper Functions
 */
@@ -516,9 +521,9 @@ impl BTree {
                 new_branch.branch_type = match &*l {
                     LeafNode(_) => {Leaf}
                     BranchNode(_) => {Branch}
-                    OverflowNode(_, _, _) => {BranchChildType::Null}
+                    OverflowNode(_, _, _) => { dtype::Null}
                     Null => {
-                        BranchChildType::Null
+                        dtype::Null
                     }
                 };
                 new_branch.num_leafs += get_num_leafs(&l);
@@ -786,7 +791,7 @@ mod tests {
 
         match &tree.root {
             BranchNode(branch) => {
-                assert_eq!(branch.branch_type, BranchChildType::Branch);
+                assert_eq!(branch.branch_type, dtype::Branch);
                 assert!(branch.indexes.len() > 1);
                 assert_eq!(branch.indexes.len() + 1, branch.data.len());
             },
