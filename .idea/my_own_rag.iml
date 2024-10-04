@@ -5,8 +5,9 @@
       <sourceFolder url="file://$MODULE_DIR$/backend/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/backend/target" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/llamaindex_wrapper/venv" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.12 (my_own_rag)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.12 (my_own_rag) (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

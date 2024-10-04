@@ -24,7 +24,6 @@ impl DbItem {
     }
 }
 
-
 impl VectorItem for DbItem {
     fn from_text(text_data: &str, embedding: &Embedding, llama_tokenizer: &LlamaTokenizer) -> Self {
         let tokens = llama_tokenizer.encode(text_data);
