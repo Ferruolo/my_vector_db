@@ -1,7 +1,7 @@
-use crate::vector_b_tree::dtype::{Branch, Leaf};
-use crate::vector_b_tree::TreeNode::{BranchNode, LeafNode, Null, OverflowNode};
 use std::cmp::{max, min};
 use std::mem::swap;
+use std::sync::{Arc, Mutex};
+use crate::vector_b_tree::TreeNode::{*};
 
 const ELEMENTS_PER_PAGE: usize = 4;
 const MAX_LIVE_PAGES: usize = 8;
@@ -10,486 +10,134 @@ const MAX_LIVE_PAGES: usize = 8;
 type DataType = String;
 type IndexType = usize;
 
-// Can we combine these two similar items?
-#[derive(Debug)]
-struct BranchItem {
-    indexes: Vec<IndexType>,
-    data: Vec<TreeNode>,
-    branch_type: dtype,
-    num_leafs: usize,
-    max_depth: usize,
-}
+/*
+ * Base Functions
+*/
+// Invariants:
+// * Depth is equal across
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum dtype {
-    // Assert that all types are equal throughout the branch
+enum TreeNode {
     Null,
-    Leaf,
-    Branch
+    InternalNode(InternalItem),
+    LeafNode(LeafItem),
 }
 
-
-fn print_branch_type(x: &dtype) -> String {
-    match x {
-        dtype::Null => { "NULL".parse().unwrap() }
-        Leaf => { "LEAF".parse().unwrap() }
-        Branch => { "BRANCH".parse().unwrap() }
-    }
-}
-
-
-fn binary_search<F>(index_list: &Vec<IndexType>, comparator: F, index: &IndexType) -> IndexType
-where
-    F: Fn(&IndexType, &IndexType) -> bool,
-{
-    let mut low: usize = 0;
-    let mut high: usize = index_list.len();
-
-    while low < high {
-        let mid = low + (high - low) / 2;
-        if comparator(&index_list[mid], index) {
-            low = mid + 1;
-        } else {
-            high = mid;
-        }
-    }
-    low
-}
-
-impl BranchItem {
-    fn new() -> Self {
-        Self {
-            indexes: vec![],
-            data: vec![],
-            branch_type: dtype::Null,
-            num_leafs: 0,
-            max_depth: 0,
-        }
-    }
-}
-
-#[derive(Debug)]
 struct LeafItem {
-    indexes: Vec<IndexType>,
+    index: Vec<IndexType>,
     data: Vec<DataType>,
-    max_depth: usize,
+    left_pointer: Arc<Mutex<TreeNode>>,
+    right_pointer: Arc<Mutex<TreeNode>>,
 }
+
 
 impl LeafItem {
     fn new() -> Self {
         Self {
-            indexes: vec![],
+            index: vec![],
             data: vec![],
-            max_depth: 0
+            left_pointer: Arc::new(Mutex::new(Null)),
+            right_pointer: Arc::new(Mutex::new(Null)),
         }
     }
 }
 
-#[derive(Debug)]
-enum TreeNode {
-    LeafNode(LeafItem),
-    BranchNode(BranchItem),
-    OverflowNode(Box<TreeNode>, IndexType, Box<TreeNode>),
-    Null
+struct InternalItem {
+    index: Vec<IndexType>,
+    data: Vec<Arc<Mutex<TreeNode>>>,
+    left_pointer: Arc<Mutex<TreeNode>>,
+    right_pointer: Arc<Mutex<TreeNode>>,
 }
 
-
-struct DiskItem {
-    file_path: String,
-    dtype: dtype
-}
-
-
-fn find_midpoint(a: &IndexType, b: &IndexType) -> IndexType {
-    (a + b + 1).div_ceil(2)
-}
-
-fn get_max_depth(tree_node: &TreeNode) -> usize {
-    match tree_node {
-        LeafNode(x) => {
-            1
-        }
-        BranchNode(x) => {
-            x.max_depth
-        }
-        _ => 0
-    }
-}
-
-impl TreeNode {
-    fn print(&self, depth: usize) {
-        let indent = "-".repeat(depth);
-        match self {
-            LeafNode(leaf) => {
-                println!("{}LeafNode:", indent);
-                for (idx, data) in leaf.indexes.iter().zip(leaf.data.iter()) {
-                    println!("{}  {}: {}", indent, idx, data);
-                }
-            }
-            BranchNode(branch) => {
-                println!("{}BranchNode({} Type, {} Index Len, {} Data Len, {} Num Leaves):",
-                         indent,
-                         print_branch_type(&branch.branch_type),
-                         branch.indexes.len(),
-                         branch.data.len(),
-                         branch.num_leafs
-                );
-
-                for (idx, child) in branch.indexes.iter().zip(branch.data.iter()) {
-                    child.print(depth + 1);
-                    println!("{}  {} ->", indent, idx);
-                }
-                branch.data.last().unwrap().print(depth + 1);
-            }
-            OverflowNode(left, index, right) => {
-                println!("{}OverflowNode ({})", indent, index);
-                println!("{}  Left:", indent);
-                left.print(depth + 1);
-                println!("{}  Right:", indent);
-                right.print(depth + 1);
-            }
-            Null => println!("{}Null", indent),
+impl InternalItem {
+    fn new() -> Self {
+        Self {
+            index: vec![],
+            data: vec![],
+            left_pointer: Arc::new(Mutex::new(TreeNode::Null)),
+            right_pointer: Arc::new(Mutex::new(TreeNode::Null)),
         }
     }
 }
 
-/*
- *  Insert Helper Functions
-*/
-
-fn leaf_item_mitosis(mut node: LeafItem, index: IndexType, data: DataType) -> TreeNode {
-    node = leaf_array_insertion(node, index, data);
-    let midpt = ELEMENTS_PER_PAGE.div_ceil(2);
-    let mut left = LeafItem::new();
-    let mut right = LeafItem::new();
-
-    assert_eq!(node.indexes.len(), node.data.len());
-    // We need to take ownership here
-    let mut cur_idx = node.indexes.len();
-    node.indexes.reverse();
-    node.data.reverse();
-    while let (Some(idx), Some(d)) = (node.indexes.pop(), node.data.pop()) {
-        let new_leaf = if cur_idx > midpt { &mut left } else { &mut right };
-        new_leaf.data.push(d);
-        new_leaf.indexes.push(idx);
-        cur_idx -= 1;
-    }
-
-    let new_midpoint = find_midpoint(&left.indexes.last().unwrap(), &right.indexes.first().unwrap()) - 1;
-    OverflowNode(Box::new(LeafNode(left)), new_midpoint, Box::new(LeafNode(right)))
-}
-
-fn branch_item_mitosis(mut node: BranchItem) -> TreeNode {
-    let midpt = ELEMENTS_PER_PAGE.div_ceil(2);
-    let mut left = BranchItem::new();
-    let mut right = BranchItem::new();
-    node.indexes.reverse();
-    node.data.reverse();
-    left.branch_type = node.branch_type.clone();
-    right.branch_type = node.branch_type;
-
-    let mut cur_idx = node.indexes.len();
-    while let Some(idx) = node.indexes.pop() {
-        let new_leaf = if cur_idx > midpt { &mut left } else { &mut right };
-        new_leaf.indexes.push(idx);
-        cur_idx -= 1;
-    }
 
 
-    cur_idx = node.data.len();
-    while let Some(datum) = node.data.pop() {
-        let new_leaf = if cur_idx > (midpt + 1) { &mut left } else { &mut right };
-        new_leaf.num_leafs += get_num_leafs(&datum);
-        new_leaf.data.push(datum);
-
-        cur_idx -= 1;
-    }
-
-    // This might be a bad assumption, tbd
-    let new_midpt = left.indexes.pop().unwrap();
-
-    OverflowNode(Box::new(BranchNode(left)), new_midpt, Box::new(BranchNode(right)))
-}
-
-// I never know if going with the imperative route or the functional route is better for the compiler
-fn leaf_array_insertion(mut node: LeafItem, index: IndexType, data: DataType) -> LeafItem {
-    let insert_position = node.indexes.binary_search(&index).unwrap_or_else(|pos| pos);
-    node.indexes.insert(insert_position, index);
-    node.data.insert(insert_position, data);
-    node
-}
-
-// Make sure we take ownership here, no borrowing. <- this may not scale
-fn insert_into_leaf_node(mut node: LeafItem, index: IndexType, data: DataType) -> TreeNode {
-    let idx = binary_search(&node.indexes, compare_index_type, &index);
-    if idx < node.indexes.len() && node.indexes[idx] == index {
-        node.data[idx] = data;
-        LeafNode(node)
-    } else if node.indexes.len() >= ELEMENTS_PER_PAGE {
-        leaf_item_mitosis(
-            node,
-            index,
-            data
-        )
-    } else {
-        LeafNode(leaf_array_insertion(node, index, data))
-    }
-}
-
-fn compare_index_type(left: &IndexType, right: &IndexType) -> bool {
-    left < right
-}
-
-fn get_num_leafs(x: &TreeNode) -> usize {
-    match x {
-        LeafNode(x) => {x.data.len()}
-        BranchNode(x) => {x.num_leafs}
-        _ => 0
-    }
-}
-
-
-fn insert_into_branch_node(mut node: BranchItem, index: IndexType, data: DataType) -> TreeNode {
-    let idx = binary_search(&node.indexes, compare_index_type, &index);
-
-    let mut selected = Null;
-    swap(&mut selected, &mut node.data[idx]);
-    // println!("Num Leaves Node: {}", node.num_leafs);
-    // println!("Num Leaves Edited: {}", get_num_leafs(&selected));
-    // println!("{:?}", node);
-    node.num_leafs -= get_num_leafs(&selected);
-    let result = match insert_item(selected, index, data) {
-        BranchNode(x) => {
-            node.data[idx] = BranchNode(x);
-            node.num_leafs += get_num_leafs(&node.data[idx]);
-            node.max_depth = node.data.iter().map(|x| {get_max_depth(x)}).max().unwrap() + 1;
-            node
-        }
-        OverflowNode(left, new_index, right) => {
-            node.num_leafs += get_num_leafs(&left);
-            node.num_leafs += get_num_leafs(&right);
-            match (*left, *right) { 
-                (LeafNode(l), LeafNode(r)) => {
-                    match node.branch_type {
-                        Leaf => {()} // Null Op for Enum
-                        _ => {panic!("Wrong Type of merge here????!!")}
-                    }
-                    let left_idx = binary_search(&node.indexes, compare_index_type, &new_index);
-                    node.indexes.insert(left_idx, new_index);
-                    // Oh how I hate to code imperatively (jk I'm too dumb not to)
-                    node.max_depth =  node.data.iter().map(|x| {get_max_depth(x)}).max().unwrap() + 1;
-                    node.data[left_idx] =  LeafNode(l);
-                    node.data.insert(left_idx + 1, LeafNode(r));
-
-                    node
-                }
-                (BranchNode(l), BranchNode(r)) => {
-                    match node.branch_type {
-                        Branch => {()} // Null Op for Enum
-                        _ => {panic!("Wrong Type of merge here????!!")}
-                    }
-
-                    let left_idx = binary_search(&node.indexes, compare_index_type, &new_index);
-                    node.indexes.insert(left_idx, new_index);
-                    // Oh how I hate to code imperatively (jk I'm too dumb not to)
-                    let wrapped_l = BranchNode(l);
-                    let wrapped_r = BranchNode(r);
-                    
-                    node.max_depth = node.data.iter().map(|x| {get_max_depth(x)}).max().unwrap() + 1;
-                    node.data[left_idx] =  wrapped_l;
-                    node.data.insert(left_idx + 1, wrapped_r);
-                    
-                    node
-                }
-                _ => {panic!("And you may ask yourself 'How did I get here'")}                
-            }
-        }
-        LeafNode(x) => {
-            node.data[idx] = LeafNode(x);
-            node.num_leafs += get_num_leafs(&node.data[idx]);
-            node
-        }
-        _ => {panic!("And you may ask yourself 'How did I get here'")}
-    };
-    if result.data.len() > ELEMENTS_PER_PAGE {
-        branch_item_mitosis(result)
-    } else {
-        BranchNode(result)
-    }
-}
-
-/*
- * Delete Helper Functions
-*/
-fn delete_from_leaf_node(mut node: LeafItem, index: IndexType) -> TreeNode {
-    let idx = binary_search(&node.indexes, compare_index_type, &index);
-    if idx < node.indexes.len() && node.indexes[idx] == index {
-        node.indexes.remove(idx);
-        node.data.remove(idx);
-    }
-
-    if node.indexes.is_empty() {
-        Null
-    } else {
-        LeafNode(node)
-    }
-}
-
-fn delete_from_branch_node(mut node: BranchItem, index: IndexType) -> TreeNode {
-    let idx = binary_search(&node.indexes, compare_index_type, &index);
-    let mut selected = Null;
-    swap(&mut selected, &mut node.data[idx]);
-    node.num_leafs -= get_num_leafs(&selected);
-    match delete_item(selected, index) {
-        LeafNode(x) => {
-            node.data[idx] = LeafNode(x);
-            node.num_leafs += get_num_leafs(&node.data[idx]);
-            node.max_depth = node.data.iter().map(|x| {get_max_depth(x) }).max().unwrap();
-            if node.num_leafs < ELEMENTS_PER_PAGE { // Merge Leafs
-                merge_leafs(node)
-            } else {
-                BranchNode(node)
-            }
-        }
-        BranchNode(x) => {
-            node.data[idx] = BranchNode(x);
-            node.num_leafs += get_num_leafs(&node.data[idx]);
-            node.max_depth = node.data.iter().map(|x| {get_max_depth(x) }).max().unwrap();
-            BranchNode(node)
-        }
-        Null => {
-            if node.num_leafs == 0 || node.indexes.len() == 0 || node.data.len() ==0 {
-                return Null;
-            }
-            
-            node.data.remove(idx);
-            node.indexes.remove(
-                min(idx,
-                    if !node.indexes.is_empty() { 
-                        node.indexes.len() - 1 
-                    } else {
-                        0 
-                    }
-                )
-            );
-            if node.num_leafs > 0 {
-                BranchNode(node)
-            } else {
-                Null
-            }
-        }
-        _ => {
-            Null
+// Comparator returns true if l < r
+fn binary_search(data: &Vec<IndexType>, index: &IndexType, comparator: impl Fn(&IndexType, &IndexType) -> bool) -> usize {
+    let mut low: usize = 0;
+    let mut high: usize = data.len();
+    while low < high {
+        let mid: usize = (low + high) / 2;
+        if comparator(&data[mid], index) {
+            high = mid;
+        } else { 
+            low = mid;
         }
     }
+    return low;
 }
 
-fn copy_leaf_node_data_over(source: LeafItem, target: &mut LeafItem) {
-    //  Note that we take ownership to ensure that source is dropped after
-    let mut data = source.data;
-    let mut indexes = source.indexes;
-    indexes.reverse();
-    data.reverse();
-    while let Some(d) = data.pop() {
-        target.data.push(d);
-    }
-    while let Some(i) = indexes.pop() {
-        target.indexes.push(i);
-    }
+fn compare(l : &IndexType, r: &IndexType) -> bool {
+    l < r
 }
 
-
-
-fn merge_leafs(mut node: BranchItem) -> TreeNode {
-    if node.num_leafs == 0 {
-        return Null
-    }
-    
-    let mut leaf = LeafItem::new();
-    
-    node.data.reverse();
-    
-    while let Some(item) = node.data.pop() {
-        match item {
-            LeafNode(x) => {
-                copy_leaf_node_data_over(x, &mut leaf);
-            }
-            BranchNode(x) => {
-                match merge_leafs(x) {
-                    LeafNode(x) => {
-                        copy_leaf_node_data_over(x, &mut leaf);
-                    }
-                    _ => {panic!("Merge Leafs returned wrong type (idk how)")}
-                }
-            }
-            _ => {
-                
-                panic!("Non leaf Node in weird place");
-            }
-        }
-    }
-    //Edge Case: Maybe this passes over the limit?
-    LeafNode(leaf)
-}
-
-/*
- * Base Functions
-*/
 
 fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
     match node {
-        LeafNode(node) => {
-            insert_into_leaf_node(node, index, data)
-        }
-        BranchNode(node) => {
-            insert_into_branch_node(node, index, data)
-        }
         Null => {
-            let new_item = LeafItem::new();
-            insert_into_leaf_node(new_item, index, data)
+            // Tree is empty, simply return a new Leaf Item
+            // Still not clean
+            let mut new_leaf = LeafItem::new();
+            new_leaf.index.push(index);
+            new_leaf.data.push(data);
+            LeafNode(new_leaf)
         }
-        OverflowNode(left, new_index, right) => {
-            OverflowNode(left, new_index, right)
+        InternalNode(_) => {
+            Null
         }
-    }
-}
-
-
-fn get_data(tree_node: &TreeNode, index: IndexType) -> Option<&DataType> {
-    // Should this return reference or copy? TBD
-    match tree_node {
-        LeafNode(x) => { 
-            let idx = binary_search(&x.indexes, compare_index_type, &index);
-            if idx < x.indexes.len() && x.indexes[idx] == index {
-                x.data.get(idx)
+        LeafNode(mut x) => {
+            if (x.index.len() < ELEMENTS_PER_PAGE) {
+                let loc = binary_search(&x.index, &index, compare);
+                if (x.index[loc] == index) {
+                    x.data[loc] = data;
+                } else {
+                    x.index.insert(loc, index);
+                    x.data.insert(loc, data);
+                }
+                LeafNode(x)
             } else {
-                None
+                let loc = binary_search(&x.index, &index, compare);
+                // We need to split
+                x.index.insert(loc, index);
+                x.data.insert(loc, data);
+                let mut left = LeafItem::new();
+                let mut right = LeafItem::new();
+                let midpt = x.index.len().div_ceil(2); // Should equal 3
+                let mid_idx = x.index[midpt];
+                let mut leaf_ref = &mut left;
+                while let (Some(idx), Some(datum)) = (x.index.pop(), x.data.pop()) {
+                    if (x.index.len() == midpt) {
+                        leaf_ref = &mut right;
+                    }
+                    leaf_ref.index.push(idx);
+                    leaf_ref.data.push(datum);
+                }
+                let mut new_internal_node = InternalItem::new();
+                new_internal_node.data.push(Arc::new(Mutex::new(LeafNode(left))));
+                new_internal_node.data.push(Arc::new(Mutex::new(LeafNode(right))));
+                new_internal_node.index.push(mid_idx);
+                InternalNode(new_internal_node)
             }
         }
-        BranchNode(x) => {
-            let arr_idx = binary_search(&x.indexes, compare_index_type, &index);
-            get_data(&x.data[arr_idx], index)
-        }
-        _ => None,
     }
 }
 
-
-fn delete_item(tree_node: TreeNode, index: IndexType) -> TreeNode {
-    match tree_node {
-        LeafNode(node) => {
-            delete_from_leaf_node(node, index)
-        }
-        BranchNode(
-            node
-        ) => {
-            delete_from_branch_node(node, index)
-        }
-        _ => {Null}
-    }
+fn get_item() {
     
 }
 
+fn delete_item() {
+    
+}
 
 /*
  *  Wrapper!
