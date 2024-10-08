@@ -98,9 +98,17 @@ fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataTy
         let mut right = LeafItem::new();
         let midpt = ELEMENTS_PER_PAGE.div_ceil(2);
         let mid_idx = leaf_item.index.get(midpt).unwrap().clone();
-        while let (Some(idx), Some(datum)) = (leaf_item.index.pop(), leaf_item.data.pop()) {}
-
-
+        while let (Some(idx), Some(datum)) = (leaf_item.index.pop(), leaf_item.data.pop()) {
+            let selected = if leaf_item.index.len() <= midpt {
+                &mut left
+            } else {
+                &mut right
+            };
+            selected.index.push(idx);
+            selected.data.push(datum);
+            
+        }
+        
         // Fix Pointers
         left.left_pointer = leaf_item.left_pointer.clone();
         right.right_pointer = leaf_item.right_pointer.clone();
@@ -117,7 +125,7 @@ fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataTy
             }
             _ => panic!(""),
         }
-        OverflowNode(left_wrapped, index, right_wrapped)
+        OverflowNode(left_wrapped, mid_idx, right_wrapped)
     } else {
         LeafNode(leaf_item)
     }
