@@ -1,8 +1,6 @@
-use std::cmp::{max, min};
 use std::mem::swap;
-use std::ops::{Deref, DerefMut};
+use std::ops::{DerefMut};
 use std::sync::{Arc, Mutex};
-use pyo3::ffi::newfunc;
 use crate::vector_b_tree::TreeNode::{*};
 
 const ELEMENTS_PER_PAGE: usize = 4;
@@ -62,8 +60,6 @@ impl InternalItem {
     }
 }
 
-
-
 // Comparator returns true if l < r
 fn binary_search(data: &Vec<IndexType>, index: &IndexType, comparator: impl Fn(&IndexType, &IndexType) -> bool) -> usize {
     let mut low: usize = 0;
@@ -82,11 +78,6 @@ fn binary_search(data: &Vec<IndexType>, index: &IndexType, comparator: impl Fn(&
 fn compare(l : &IndexType, r: &IndexType) -> bool {
     l < r
 }
-
-
-
-
-
 
 fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataType) -> TreeNode {
     let loc = binary_search(&leaf_item.index, &index, compare);
@@ -132,6 +123,27 @@ fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataTy
 }
 
 
+fn insert_into_internal_item(mut internal_item: InternalItem, index: IndexType, data: DataType) -> TreeNode {
+    let loc = binary_search(&internal_item.index, &index, compare);
+    let node_ref = &internal_item.data[loc].clone().lock().unwrap().deref_mut();
+    let mut node = Null;
+    swap(*node_ref, &mut node);
+    let new_node = match insert_item(node, index, data) {
+        OverflowNode(left, idx, right) => {
+            
+            
+            
+            Null
+        }
+        x => {x}
+    };
+    
+    **node_ref = new_node;
+    InternalNode(internal_item)
+}
+
+
+
 fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
     match node {
         Null => {
@@ -140,7 +152,9 @@ fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
             leaf_node.data.push(data);
             return LeafNode(leaf_node);
         }
-        InternalNode(_) => {}
+        InternalNode(x) => {
+            return insert_into_internal_item
+        }
         LeafNode(x) => {
             return insert_into_leaf_node(x, index, data)
         }

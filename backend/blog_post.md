@@ -122,4 +122,7 @@ Going to take a lunch break and then start a new iteration where I fix this.
 This time, I'm going to use a couple more functions to make things cleaner, and account
 for different structures, and make sure we're watching the invariants.
 
+Lets see if we can push thorough the rest of this session with the wrong one,
+and then fix when we get done.
+
 
