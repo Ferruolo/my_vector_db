@@ -1,3 +1,4 @@
+use std::fmt;
 use crate::vector_b_tree::TreeNode::*;
 use std::mem::swap;
 use std::ops::DerefMut;
@@ -209,6 +210,13 @@ fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
 }
 
 
+
+impl fmt::Display for TreeNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.print_node(f, 0)
+    }
+}
+
 impl TreeNode {
     pub fn get_item(&self, index: &IndexType) -> Option<DataType> {
         self.get_item_inner(index)
@@ -237,12 +245,46 @@ impl TreeNode {
             Null => None,
         }
     }
+    fn print_node(&self, f: &mut fmt::Formatter<'_>, depth: usize) -> fmt::Result {
+        let indent = "  ".repeat(depth);
+        match self {
+            TreeNode::Null => writeln!(f, "{}Null", indent),
+            TreeNode::InternalNode(internal) => {
+                writeln!(f, "{}InternalNode:", indent)?;
+                for (i, (idx, child)) in internal.index.iter().zip(internal.data.iter()).enumerate() {
+                    writeln!(f, "{}  [{}] Key: {}", indent, i, idx)?;
+                    if let Ok(child_node) = child.lock() {
+                        child_node.print_node(f, depth + 2)?;
+                    }
+                }
+                Ok(())
+            },
+            TreeNode::LeafNode(leaf) => {
+                writeln!(f, "{}LeafNode:", indent)?;
+                for (idx, data) in leaf.index.iter().zip(leaf.data.iter()) {
+                    writeln!(f, "{}  Key: {}, Value: {}", indent, idx, data)?;
+                }
+                Ok(())
+            },
+            TreeNode::OverflowNode(left, pivot, right) => {
+                writeln!(f, "{}OverflowNode (Pivot: {}):", indent, pivot)?;
+                writeln!(f, "{}  Left:", indent)?;
+                if let Ok(left_node) = left.lock() {
+                    left_node.print_node(f, depth + 2)?;
+                }
+                writeln!(f, "{}  Right:", indent)?;
+                if let Ok(right_node) = right.lock() {
+                    right_node.print_node(f, depth + 2)?;
+                }
+                Ok(())
+            },
+        }
+    }
 }
 
 
-
 fn delete_item() {
-    
+    panic!("TODO!")
 }
 
 /*
@@ -267,18 +309,20 @@ impl BTree {
     }
 
     pub(crate) fn set_item(&mut self, index: IndexType, data: DataType) {
-        
+        let mut node = Null;
+        swap(&mut self.root, &mut node);
+        self.root = insert_item(node, index, data);
     }
 
     pub fn remove(&mut self, index: IndexType) {
     }
 
-    pub fn get_item(&mut self, index: IndexType) -> Option<&DataType> {
-        None
+    pub fn get_item(&mut self, index: IndexType) -> Option<DataType> {
+        return self.root.get_item(&index)
     }
 
     pub fn print(&self) {
-
+        println!("{}", self);
     }
     pub fn get_num_elements(&self) -> usize {
         self.num_elements
@@ -289,3 +333,13 @@ impl BTree {
     }
 }
 
+impl fmt::Display for BTree {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "BTree:")?;
+        writeln!(f, "  Number of elements: {}", self.num_elements)?;
+        writeln!(f, "  Number of live pages: {}", self.num_live_pages)?;
+        writeln!(f, "  Max depth: {}", self.max_depth)?;
+        writeln!(f, "  Tree structure:")?;
+        self.root.print_node(f, 1)
+    }
+}
