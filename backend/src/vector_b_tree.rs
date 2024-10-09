@@ -1,5 +1,6 @@
 use std::mem::swap;
 use std::ops::{DerefMut};
+use std::ptr::null;
 use std::sync::{Arc, Mutex};
 use crate::vector_b_tree::TreeNode::{*};
 
@@ -72,7 +73,7 @@ fn binary_search(data: &Vec<IndexType>, index: &IndexType, comparator: impl Fn(&
             low = mid;
         }
     }
-    return low;
+    low
 }
 
 fn compare(l : &IndexType, r: &IndexType) -> bool {
@@ -89,6 +90,11 @@ fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataTy
         let mut right = LeafItem::new();
         let midpt = ELEMENTS_PER_PAGE.div_ceil(2);
         let mid_idx = leaf_item.index.get(midpt).unwrap().clone();
+        
+        leaf_item.index.reverse();
+        leaf_item.data.reverse();
+        
+         
         while let (Some(idx), Some(datum)) = (leaf_item.index.pop(), leaf_item.data.pop()) {
             let selected = if leaf_item.index.len() <= midpt {
                 &mut left
@@ -125,50 +131,58 @@ fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataTy
 
 fn insert_into_internal_item(mut internal_item: InternalItem, index: IndexType, data: DataType) -> TreeNode {
     let loc = binary_search(&internal_item.index, &index, compare);
-    let node_ref = &internal_item.data[loc].clone().lock().unwrap().deref_mut();
-    let mut node = Null;
-    swap(*node_ref, &mut node);
-    let new_node = match insert_item(node, index, data) {
-        OverflowNode(left, idx, right) => {
+    let mut node_ref = Null;
+    swap(internal_item.data[loc].lock().unwrap().deref_mut(), &mut node_ref);
+    match insert_item(node_ref, index, data) {
+        OverflowNode(l, idx, r) => {
             
-            
-            
-            Null
         }
-        x => {x}
-    };
-    
-    **node_ref = new_node;
-    InternalNode(internal_item)
+        mut x => {
+            swap(internal_item.data[loc].lock().unwrap().deref_mut(), &mut x);
+            InternalNode(internal_item)
+        }
+    }
 }
 
 
 
 fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
     match node {
+
         Null => {
-            let mut leaf_node = LeafItem::new();
-            leaf_node.index.push(index);
-            leaf_node.data.push(data);
-            return LeafNode(leaf_node);
+            let leaf_node = LeafItem::new();
+            insert_item(LeafNode(leaf_node), index, data)
         }
         InternalNode(x) => {
-            return insert_into_internal_item
+            insert_into_internal_item(x, index, data)
         }
         LeafNode(x) => {
-            return insert_into_leaf_node(x, index, data)
+            insert_into_leaf_node(x, index, data)
         }
         OverflowNode(_, _, _) => {
             panic!("Never should be inserting into an Overflow node")
         }
     }
-    Null
 }
 
 
 
-fn get_item() {
-    
+fn get_item(node: TreeNode, index: IndexType) -> Option<DataType> {
+    match node {
+        InternalNode(x) => {
+            let loc = binary_search(&x.index, &index, compare);
+            get_item(*(x.data[loc].lock().unwrap()), index)
+        }
+        LeafNode(x) => {
+            let loc = binary_search(&x.index, &index, compare);
+            if (x.index[loc] == index) {
+                Some(x.data[loc].clone())
+            } else {
+                None
+            }
+        }
+        _ => None
+    }
 }
 
 fn delete_item() {
