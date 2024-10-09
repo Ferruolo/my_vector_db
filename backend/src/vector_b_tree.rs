@@ -1,8 +1,7 @@
+use crate::vector_b_tree::TreeNode::*;
 use std::mem::swap;
-use std::ops::{DerefMut};
-use std::ptr::null;
+use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
-use crate::vector_b_tree::TreeNode::{*};
 
 const ELEMENTS_PER_PAGE: usize = 4;
 const MAX_LIVE_PAGES: usize = 8;
@@ -128,6 +127,44 @@ fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataTy
     }
 }
 
+fn split_internal_item(mut internal_item: InternalItem) -> TreeNode {
+    let mut left = InternalItem::new();
+    let mut right = InternalItem::new();
+    let midpt = ELEMENTS_PER_PAGE.div_ceil(2);
+    let mid_idx = internal_item.index.get(midpt).unwrap().clone();
+
+    internal_item.index.reverse();
+    internal_item.data.reverse();
+
+    // Duplicated from above, pls fix thanks
+    while let (Some(idx), Some(datum)) = (internal_item.index.pop(), internal_item.data.pop()) {
+        let selected = if internal_item.index.len() <= midpt {
+            &mut left
+        } else {
+            &mut right
+        };
+        selected.index.push(idx);
+        selected.data.push(datum);
+    }
+    // Fix Pointers
+    left.left_pointer = internal_item.left_pointer.clone();
+    right.right_pointer = internal_item.right_pointer.clone();
+
+    let left_wrapped = Arc::new(Mutex::new(InternalNode(left)));
+
+    right.left_pointer = left_wrapped.clone();
+    let right_wrapped = Arc::new(Mutex::new(InternalNode(right)));
+
+    // This is pretty awkward, please fix?
+    match left_wrapped.lock().unwrap().deref_mut() {
+        LeafNode(x) => {
+            x.right_pointer = right_wrapped.clone();
+        }
+        _ => panic!(""),
+    }
+    OverflowNode(left_wrapped, mid_idx, right_wrapped)
+}
+
 
 fn insert_into_internal_item(mut internal_item: InternalItem, index: IndexType, data: DataType) -> TreeNode {
     let loc = binary_search(&internal_item.index, &index, compare);
@@ -135,12 +172,18 @@ fn insert_into_internal_item(mut internal_item: InternalItem, index: IndexType, 
     swap(internal_item.data[loc].lock().unwrap().deref_mut(), &mut node_ref);
     match insert_item(node_ref, index, data) {
         OverflowNode(l, idx, r) => {
-            
+            internal_item.data[loc] = l;
+            internal_item.data.insert(loc + 1, r);
+            internal_item.index.insert(loc + 1, idx);
         }
         mut x => {
             swap(internal_item.data[loc].lock().unwrap().deref_mut(), &mut x);
-            InternalNode(internal_item)
         }
+    }
+    if internal_item.data.len() >= ELEMENTS_PER_PAGE {
+        split_internal_item(internal_item)
+    } else {
+        InternalNode(internal_item)
     }
 }
 
@@ -166,24 +209,37 @@ fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
 }
 
 
+impl TreeNode {
+    pub fn get_item(&self, index: &IndexType) -> Option<DataType> {
+        self.get_item_inner(index)
+    }
 
-fn get_item(node: TreeNode, index: IndexType) -> Option<DataType> {
-    match node {
-        InternalNode(x) => {
-            let loc = binary_search(&x.index, &index, compare);
-            get_item(*(x.data[loc].lock().unwrap()), index)
+    fn get_item_inner(&self, index: &IndexType) -> Option<DataType> {
+        match self {
+            InternalNode(internal) => {
+                let loc = binary_search(&internal.index, index, compare);
+                internal.data.get(loc)
+                    .and_then(|node| node.lock().ok())
+                    .and_then(|node| node.get_item_inner(index))
+            },
+            LeafNode(leaf) => {
+                let loc = binary_search(&leaf.index, index, compare);
+                leaf.index.get(loc)
+                    .and_then(|idx| if idx == index { leaf.data.get(loc).cloned() } else { None })
+            },
+            OverflowNode(left, pivot, right) => {
+                if index < pivot {
+                    left.lock().ok().and_then(|node| node.get_item_inner(index))
+                } else {
+                    right.lock().ok().and_then(|node| node.get_item_inner(index))
+                }
+            },
+            Null => None,
         }
-        LeafNode(x) => {
-            let loc = binary_search(&x.index, &index, compare);
-            if (x.index[loc] == index) {
-                Some(x.data[loc].clone())
-            } else {
-                None
-            }
-        }
-        _ => None
     }
 }
+
+
 
 fn delete_item() {
     
