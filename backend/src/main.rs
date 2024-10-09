@@ -7,19 +7,28 @@ fn main() {
     let mut tree = BTree::new();
     let strings: Vec<String> = vec![
         String::from("E"),
-        String::from("F"),
+        String::from("G"),
         String::from("T"),
-        String::from("Q")
+        String::from("Q"),
+        String::from("F")
     ];
 
-    println!("Adding 9");
-    tree.set_item(9, strings[0].clone());
-    println!("Adding 10");
-    tree.set_item(10, strings[1].clone());
-    println!("Adding 12");
-    tree.set_item(12, strings[2].clone());
-    println!("Adding 23");
-    tree.set_item(23, strings[3].clone());
 
+    tree.set_item(9, strings[0].clone());
+    tree.set_item(10, strings[1].clone());
+    tree.set_item(12, strings[2].clone());
+    tree.set_item(23, strings[3].clone());
+    tree.set_item(5, strings[4].clone());
+    // assert_eq!(tree.get_num_elements(), 4);
+    println!("{}", tree.get_depth());
+    println!("{:?}", tree.get_item(9));
+    println!("{:?}", tree.get_item(10));
+    println!("{:?}", tree.get_item(11));
+
+    println!("{:?}", tree.get_item(12));
+
+    println!("{:?}", (tree.get_item(23)));
+    println!("{:?}",(tree.get_item(5)));
+    
     tree.print();
 }

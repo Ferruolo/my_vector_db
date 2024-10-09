@@ -15,7 +15,7 @@ type IndexType = usize;
  * Base Functions
 */
 // Invariants:
-// * Depth is equal across
+
 
 enum TreeNode {
     Null,
@@ -53,16 +53,16 @@ struct InternalItem {
 impl InternalItem {
     fn new() -> Self {
         Self {
-            index: vec![],
+            index: vec![usize::max_value()],
             data: vec![],
-            left_pointer: Arc::new(Mutex::new(TreeNode::Null)),
-            right_pointer: Arc::new(Mutex::new(TreeNode::Null)),
+            left_pointer: Arc::new(Mutex::new(Null)),
+            right_pointer: Arc::new(Mutex::new(Null)),
         }
     }
 }
 
 // Comparator returns true if l < r
-fn binary_search(data: &Vec<IndexType>, index: &IndexType, comparator: impl Fn(&IndexType, &IndexType) -> bool) -> usize {
+fn binary_search_leafs(data: &Vec<IndexType>, index: &IndexType, comparator: impl Fn(&IndexType, &IndexType) -> bool) -> usize {
     if data.len() == 0 {
         return 0;
     }
@@ -70,9 +70,12 @@ fn binary_search(data: &Vec<IndexType>, index: &IndexType, comparator: impl Fn(&
     let mut low: usize = 0;
     let mut high: usize = data.len();
     while low < high {
-        let mid: usize = (low + high) / 2;
+        let mid: usize = low + (high - low) / 2;
+
         if comparator(index, &data[mid]) {
             high = mid;
+        } else if !comparator(&data[mid], index) {
+            return mid;
         } else {
             low = mid + 1;
         }
@@ -80,12 +83,27 @@ fn binary_search(data: &Vec<IndexType>, index: &IndexType, comparator: impl Fn(&
     low
 }
 
+fn binary_search_internal_nodes(data: &Vec<IndexType>, index: &IndexType, comparator: impl Fn(&IndexType, &IndexType) -> bool) -> usize {
+    let mut low: usize = 0;
+    let mut high: usize = data.len();
+    while low < high {
+        let mid: usize = low + (high - low) / 2;
+        if comparator(index, &data[mid]) {
+            high = mid;
+        } else {
+            low = mid + 1;
+        }
+    }
+    high
+}
+
+
 fn compare(l : &IndexType, r: &IndexType) -> bool {
-    l <= r
+    l < r
 }
 
 fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataType) -> TreeNode {
-    let loc = binary_search(&leaf_item.index, &index, compare);
+    let loc = binary_search_leafs(&leaf_item.index, &index, compare);
     leaf_item.index.insert(loc, index);
     leaf_item.data.insert(loc, data);
 
@@ -100,7 +118,7 @@ fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataTy
         
          
         while let (Some(idx), Some(datum)) = (leaf_item.index.pop(), leaf_item.data.pop()) {
-            let selected = if leaf_item.index.len() <= midpt {
+            let selected = if leaf_item.index.len() > midpt {
                 &mut left
             } else {
                 &mut right
@@ -172,7 +190,7 @@ fn split_internal_item(mut internal_item: InternalItem) -> TreeNode {
 
 
 fn insert_into_internal_item(mut internal_item: InternalItem, index: IndexType, data: DataType) -> TreeNode {
-    let loc = binary_search(&internal_item.index, &index, compare);
+    let loc = binary_search_internal_nodes(&internal_item.index, &index, compare);
     let mut node_ref = Null;
     swap(internal_item.data[loc].lock().unwrap().deref_mut(), &mut node_ref);
     match insert_item(node_ref, index, data) {
@@ -229,13 +247,15 @@ impl TreeNode {
     fn get_item_inner(&self, index: &IndexType) -> Option<DataType> {
         match self {
             InternalNode(internal) => {
-                let loc = binary_search(&internal.index, index, compare);
+
+                let loc = binary_search_internal_nodes(&internal.index, &index, compare);
+
                 internal.data.get(loc)
                     .and_then(|node| node.lock().ok())
                     .and_then(|node| node.get_item_inner(index))
             },
             LeafNode(leaf) => {
-                let loc = binary_search(&leaf.index, index, compare);
+                let loc = binary_search_leafs(&leaf.index, index, compare);
                 leaf.index.get(loc)
                     .and_then(|idx| if idx == index {
                         leaf.data.get(loc).cloned()
@@ -256,8 +276,8 @@ impl TreeNode {
     fn print_node(&self, f: &mut fmt::Formatter<'_>, depth: usize) -> fmt::Result {
         let indent = "  ".repeat(depth);
         match self {
-            TreeNode::Null => writeln!(f, "{}Null", indent),
-            TreeNode::InternalNode(internal) => {
+            Null => writeln!(f, "{}Null", indent),
+            InternalNode(internal) => {
                 writeln!(f, "{}InternalNode:", indent)?;
                 for (i, (idx, child)) in internal.index.iter().zip(internal.data.iter()).enumerate() {
                     writeln!(f, "{}  [{}] Key: {}", indent, i, idx)?;
@@ -265,16 +285,17 @@ impl TreeNode {
                         child_node.print_node(f, depth + 2)?;
                     }
                 }
+                // internal.data.last().unwrap().lock().unwrap().print_node(f, depth + 2)?;
                 Ok(())
             },
-            TreeNode::LeafNode(leaf) => {
+            LeafNode(leaf) => {
                 writeln!(f, "{}LeafNode:", indent)?;
                 for (idx, data) in leaf.index.iter().zip(leaf.data.iter()) {
                     writeln!(f, "{}  Key: {}, Value: {}", indent, idx, data)?;
                 }
                 Ok(())
             },
-            TreeNode::OverflowNode(left, pivot, right) => {
+            OverflowNode(left, pivot, right) => {
                 writeln!(f, "{}OverflowNode (Pivot: {}):", indent, pivot)?;
                 writeln!(f, "{}  Left:", indent)?;
                 if let Ok(left_node) = left.lock() {
@@ -301,11 +322,6 @@ impl TreeNode {
         }
     }
 }
-
-
-
-
-
 
 fn delete_item() {
     panic!("TODO!")
@@ -335,7 +351,16 @@ impl BTree {
     pub(crate) fn set_item(&mut self, index: IndexType, data: DataType) {
         let mut node = Null;
         swap(&mut self.root, &mut node);
-        self.root = insert_item(node, index, data);
+        self.root = match insert_item(node, index, data) {
+            OverflowNode(l, idx, r) => {
+                let mut new_root = InternalItem::new();
+                new_root.index.insert(0, idx);
+                new_root.data.push(l);
+                new_root.data.push(r);
+                InternalNode(new_root)
+            }
+            other => other
+        };
     }
 
     pub fn remove(&mut self, index: IndexType) {
@@ -383,7 +408,7 @@ mod tests {
     }
 
     #[test]
-    fn basic_test() {
+    fn one_leaf() {
         let mut tree = BTree::new();
         let strings: Vec<String> = vec![
             String::from("E"),
@@ -404,6 +429,35 @@ mod tests {
         assert_eq!(tree.get_item(11), None);
         assert_eq!(tree.get_item(12), Some(strings[2].clone()));
         assert_eq!(tree.get_item(23), Some(strings[3].clone()));
+    }
+
+
+    #[test]
+    fn split_leafs() {
+        let mut tree = BTree::new();
+        let strings: Vec<String> = vec![
+            String::from("E"),
+            String::from("G"),
+            String::from("T"),
+            String::from("Q"),
+            String::from("F")
+        ];
+
+
+        tree.set_item(9, strings[0].clone());
+        tree.set_item(10, strings[1].clone());
+        tree.set_item(12, strings[2].clone());
+        tree.set_item(23, strings[3].clone());
+        tree.set_item(5, strings[4].clone());
+        // assert_eq!(tree.get_num_elements(), 4);
+        assert_eq!(tree.get_depth(), 2);
+        assert_eq!(tree.get_item(9), Some(strings[0].clone()));
+        assert_eq!(tree.get_item(10), Some(strings[1].clone()));
+        assert_eq!(tree.get_item(11), None);
+        assert_eq!(tree.get_item(12), Some(strings[2].clone()));
+        assert_eq!(tree.get_item(23), Some(strings[3].clone()));
+        assert_eq!(tree.get_item(5), Some(strings[4].clone()));
+
     }
 
     // // This test is expected to fail
