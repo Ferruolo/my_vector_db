@@ -280,7 +280,23 @@ impl TreeNode {
             },
         }
     }
+    
+    fn get_max_depth(&self, prev_depth: usize) -> usize {
+        match self {
+            InternalNode(x) => {
+                x.data.iter().map(|n| {
+                    n.lock().unwrap().get_max_depth(prev_depth + 1)
+                }).max().unwrap()
+            }
+            LeafNode(_) => {prev_depth + 1}
+            _ => {prev_depth}
+        }
+    }
 }
+
+
+
+
 
 
 fn delete_item() {
@@ -317,7 +333,7 @@ impl BTree {
     pub fn remove(&mut self, index: IndexType) {
     }
 
-    pub fn get_item(&mut self, index: IndexType) -> Option<DataType> {
+    pub fn get_item(&self, index: IndexType) -> Option<DataType> {
         return self.root.get_item(&index)
     }
 
@@ -329,7 +345,7 @@ impl BTree {
     }
 
     pub fn get_depth(&self) -> usize {
-        self.max_depth
+        self.root.get_max_depth(0)
     }
 }
 
@@ -342,4 +358,50 @@ impl fmt::Display for BTree {
         writeln!(f, "  Tree structure:")?;
         self.root.print_node(f, 1)
     }
+}
+
+// This attribute indicates that the following mod is for tests
+#[cfg(test)]
+mod tests {
+    use crate::vector_b_tree::{BTree, IndexType};
+
+    // Each test function is annotated with #[test]
+    #[test]
+    fn init_test() {
+        let tree = BTree::new();
+        assert_eq!(tree.get_num_elements(), 0);
+        assert_eq!(tree.get_depth(), 0);
+        assert_eq!(tree.get_item(0), None);
+    }
+
+    #[test]
+    fn basic_test() {
+        let mut tree = BTree::new();
+        let strings: Vec<String> = vec![
+            String::from("E"),
+            String::from("F"),
+            String::from("T"),
+            String::from("Q")
+        ];
+        
+        
+        tree.set_item(9, strings[0].clone());
+        tree.set_item(10, strings[1].clone());
+        tree.set_item(12, strings[2].clone());
+        tree.set_item(23, strings[3].clone());
+        // assert_eq!(tree.get_num_elements(), 4);
+        assert_eq!(tree.get_depth(), 1);
+        assert_eq!(tree.get_item(9), Some(strings[0].clone()));
+        assert_eq!(tree.get_item(10), Some(strings[1].clone()));
+        assert_eq!(tree.get_item(11), None);
+        assert_eq!(tree.get_item(12), Some(strings[2].clone()));
+        assert_eq!(tree.get_item(23), Some(strings[3].clone()));
+    }
+    
+    // // This test is expected to fail
+    // #[test]
+    // #[should_panic(expected = "assertion failed")]
+    // fn test_failed_assertion() {
+    //     assert_eq!(add(2, 2), 5, "This test should fail");
+    // }
 }
