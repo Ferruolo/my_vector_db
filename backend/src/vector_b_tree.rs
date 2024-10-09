@@ -63,21 +63,25 @@ impl InternalItem {
 
 // Comparator returns true if l < r
 fn binary_search(data: &Vec<IndexType>, index: &IndexType, comparator: impl Fn(&IndexType, &IndexType) -> bool) -> usize {
+    if data.len() == 0 {
+        return 0;
+    }
+
     let mut low: usize = 0;
     let mut high: usize = data.len();
     while low < high {
         let mid: usize = (low + high) / 2;
-        if comparator(&data[mid], index) {
+        if comparator(index, &data[mid]) {
             high = mid;
         } else {
-            low = mid;
+            low = mid + 1;
         }
     }
     low
 }
 
 fn compare(l : &IndexType, r: &IndexType) -> bool {
-    l < r
+    l <= r
 }
 
 fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataType) -> TreeNode {
@@ -233,7 +237,11 @@ impl TreeNode {
             LeafNode(leaf) => {
                 let loc = binary_search(&leaf.index, index, compare);
                 leaf.index.get(loc)
-                    .and_then(|idx| if idx == index { leaf.data.get(loc).cloned() } else { None })
+                    .and_then(|idx| if idx == index {
+                        leaf.data.get(loc).cloned()
+                    } else {
+                        None
+                    })
             },
             OverflowNode(left, pivot, right) => {
                 if index < pivot {
@@ -280,7 +288,7 @@ impl TreeNode {
             },
         }
     }
-    
+
     fn get_max_depth(&self, prev_depth: usize) -> usize {
         match self {
             InternalNode(x) => {
@@ -383,8 +391,8 @@ mod tests {
             String::from("T"),
             String::from("Q")
         ];
-        
-        
+
+
         tree.set_item(9, strings[0].clone());
         tree.set_item(10, strings[1].clone());
         tree.set_item(12, strings[2].clone());
@@ -397,7 +405,7 @@ mod tests {
         assert_eq!(tree.get_item(12), Some(strings[2].clone()));
         assert_eq!(tree.get_item(23), Some(strings[3].clone()));
     }
-    
+
     // // This test is expected to fail
     // #[test]
     // #[should_panic(expected = "assertion failed")]
