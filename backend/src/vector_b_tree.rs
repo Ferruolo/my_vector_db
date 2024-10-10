@@ -2,7 +2,10 @@ use std::fmt;
 use crate::vector_b_tree::TreeNode::*;
 use std::mem::swap;
 use std::ops::DerefMut;
+use std::path::Component::ParentDir;
 use std::sync::{Arc, Mutex};
+use libc::{__errno_location, daemon};
+use pyo3::impl_::panic::PanicTrap;
 
 const ELEMENTS_PER_PAGE: usize = 4;
 const MAX_LIVE_PAGES: usize = 8;
@@ -336,14 +339,120 @@ impl TreeNode {
             _ => {accum}
         }
     }
+    
+    fn set_left_pointer(&mut self, new_ptr: Arc<Mutex<TreeNode>>) { 
+        // This should not be as hard as it is
+        match self {
+            Null => {}
+            InternalNode(x) => {
+                x.right_pointer = new_ptr.clone(); // Clone because safer (idk doesn't really make a difference)
+            }
+            LeafNode(x) => {
+                x.right_pointer = new_ptr.clone();
+            }
+            OverflowNode(_, _, _) => {}
+        }
+    }
+    
 }
 
-fn delete_item() {
-    panic!("TODO!")
+fn delete_from_leaf_item(mut node: LeafItem, index: IndexType) -> TreeNode {
+    let loc = binary_search_leafs(&node.index, &index, compare);
+    if (node.index[loc] == index) {
+        node.data.remove(loc);
+        node.index.remove(loc);
+        if node.index.len() < ELEMENTS_PER_PAGE / 2 {
+            let mut left_node = Null;
+            swap(&mut left_node, node.left_pointer.lock().unwrap().deref_mut());
+            left_node = match left_node {
+                Null => {Null}// return self, no change
+                LeafNode(mut x) => {
+                    node.data.reverse();
+                    node.index.reverse();
+                    while let (Some(idx), Some(datum)) = (node.index.pop(), node.data.pop()) {
+                        x.index.push(idx);
+                        x.data.push(datum);
+                    }
+                    x.right_pointer = node.right_pointer.clone();
+                    node.right_pointer.lock().unwrap().deref_mut().set_left_pointer(node.left_pointer.clone());
+                    LeafNode(x)
+                }
+                _ => {panic!("Leaf node height or link invariant broken")}
+            };
+            swap(&mut left_node, node.left_pointer.lock().unwrap().deref_mut());
+        }
+        if (node.index.is_empty()) {
+            Null
+        } else {
+            LeafNode(node)
+        }
+    } else {
+        LeafNode(node)
+    }
+}
+
+fn delete_from_internal_node(mut node: InternalItem, index: IndexType) -> TreeNode {
+    let loc = binary_search_internal_nodes(&node.index, &index, compare);
+    let mut selected = Null;
+    swap(&mut selected, node.data[loc].lock().unwrap().deref_mut());
+    match delete_item(selected, index) {
+        LeafNode(x) => {
+            selected = LeafNode(x);
+            swap(&mut selected, node.data[loc].lock().unwrap().deref_mut())
+        }
+        InternalNode(x) => {
+            selected = InternalNode(x);
+            swap(&mut selected, node.data[loc].lock().unwrap().deref_mut())
+        }
+        Null => {
+            node.index.remove(loc);
+            node.data.remove(loc);
+            
+        }
+        OverflowNode(_, _, _) => {
+            
+        }
+    };
+
+    if node.index.len() < ELEMENTS_PER_PAGE / 2 {
+        let mut left_node = Null;
+        swap(&mut left_node, node.left_pointer.lock().unwrap().deref_mut());
+        left_node = match left_node {
+            Null => {Null}// return self, no change
+            InternalNode(mut x) => {
+                node.data.reverse();
+                node.index.reverse();
+                while let (Some(idx), Some(datum)) = (node.index.pop(), node.data.pop()) {
+                    x.index.push(idx);
+                    x.data.push(datum);
+                }
+                x.right_pointer = node.right_pointer.clone();
+                node.right_pointer.lock().unwrap().deref_mut().set_left_pointer(node.left_pointer.clone());
+                InternalNode(x)
+            }
+            _ => {panic!("Leaf node height or link invariant broken")}
+        };
+        swap(&mut left_node, node.left_pointer.lock().unwrap().deref_mut());
+    }
+    if (node.index.is_empty()) {
+        Null
+    } else {
+        InternalNode(node)
+    }
 }
 
 
-
+fn delete_item(node: TreeNode, index: IndexType) -> TreeNode {
+    match node {
+        InternalNode(mut x) => {
+            delete_from_internal_node(x, index)
+        }
+        LeafNode(x) => {
+            delete_from_leaf_item(x, index)
+        }
+        _ => Null
+    }
+}
 
 /*
  *  Wrapper!
@@ -625,10 +734,4 @@ mod tests {
             assert_eq!(*left, right);
         }
     }
-    // // This test is expected to fail
-    // #[test]
-    // #[should_panic(expected = "assertion failed")]
-    // fn test_failed_assertion() {
-    //     assert_eq!(add(2, 2), 5, "This test should fail");
-    // }
 }
