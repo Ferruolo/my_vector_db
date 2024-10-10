@@ -1,11 +1,8 @@
-use std::fmt;
 use crate::vector_b_tree::TreeNode::*;
+use std::fmt;
 use std::mem::swap;
 use std::ops::DerefMut;
-use std::path::Component::ParentDir;
 use std::sync::{Arc, Mutex};
-use libc::{__errno_location, daemon};
-use pyo3::impl_::panic::PanicTrap;
 
 const ELEMENTS_PER_PAGE: usize = 4;
 const MAX_LIVE_PAGES: usize = 8;
@@ -492,6 +489,9 @@ impl BTree {
     }
 
     pub fn remove(&mut self, index: IndexType) {
+        let mut node = Null;
+        swap(&mut self.root, &mut node);
+        self.root = delete_item(node, index);
     }
 
     pub fn get_item(&self, index: IndexType) -> Option<DataType> {
@@ -529,7 +529,7 @@ impl fmt::Display for BTree {
 // TODO: I need to write better/more extensive tests
 #[cfg(test)]
 mod tests {
-    use crate::vector_b_tree::{BTree, DataType, IndexType};
+    use crate::vector_b_tree::{BTree, DataType};
 
     // Each test function is annotated with #[test]
     #[test]
@@ -734,4 +734,123 @@ mod tests {
             assert_eq!(*left, right);
         }
     }
+
+    #[test]
+    fn delete_one_leaf() {
+        let mut tree = BTree::new();
+        let strings: Vec<String> = vec![
+            String::from("E"),
+            String::from("F"),
+            String::from("T"),
+            String::from("Q")
+        ];
+
+
+        tree.set_item(9, strings[0].clone());
+        tree.set_item(10, strings[1].clone());
+        tree.set_item(12, strings[2].clone());
+        tree.set_item(23, strings[3].clone());
+        // assert_eq!(tree.get_num_elements(), 4);
+        assert_eq!(tree.get_depth(), 1);
+        assert_eq!(tree.get_item(9), Some(strings[0].clone()));
+        assert_eq!(tree.get_item(10), Some(strings[1].clone()));
+        assert_eq!(tree.get_item(11), None);
+        assert_eq!(tree.get_item(12), Some(strings[2].clone()));
+        assert_eq!(tree.get_item(23), Some(strings[3].clone()));
+
+        tree.remove(9);
+        tree.remove(10);
+        tree.remove(12);
+        tree.remove(23);
+
+        assert_eq!(tree.get_depth(), 0);
+        assert_eq!(tree.get_item(9), None);
+        assert_eq!(tree.get_item(10), None);
+        assert_eq!(tree.get_item(12), None);
+        assert_eq!(tree.get_item(23), None);
+    }
+
+
+    #[test]
+    fn delete_no_merge() {
+        let mut tree = BTree::new();
+        let strings: Vec<String> = vec![
+            String::from("E"),
+            String::from("G"),
+            String::from("T"),
+            String::from("Q"),
+            String::from("F")
+        ];
+
+
+        tree.set_item(9, strings[0].clone());
+        tree.set_item(10, strings[1].clone());
+        tree.set_item(12, strings[2].clone());
+        tree.set_item(23, strings[3].clone());
+        tree.set_item(5, strings[4].clone());
+        // assert_eq!(tree.get_num_elements(), 4);
+        tree.remove(12);
+        assert_eq!(tree.get_depth(), 2);
+        assert_eq!(tree.get_item(9), Some(strings[0].clone()));
+        assert_eq!(tree.get_item(23), Some(strings[3].clone()));
+        assert_eq!(tree.get_item(12), None);
+    }
+
+    #[test]
+    fn delete_one_from_far_left_no_merge() {
+        let mut tree = BTree::new();
+        let strings: Vec<String> = vec![
+            String::from("E"),
+            String::from("G"),
+            String::from("T"),
+            String::from("Q"),
+            String::from("F")
+        ];
+
+
+        tree.set_item(9, strings[0].clone());
+        tree.set_item(10, strings[1].clone());
+        tree.set_item(12, strings[2].clone());
+        tree.set_item(23, strings[3].clone());
+        tree.set_item(5, strings[4].clone());
+        // assert_eq!(tree.get_num_elements(), 4);
+        assert_eq!(tree.get_item(5), Some(strings[4].clone()));
+        tree.remove(5);
+        assert_eq!(tree.get_depth(), 2);
+        assert_eq!(tree.get_item(9), Some(strings[0].clone()));
+        assert_eq!(tree.get_item(23), Some(strings[3].clone()));
+        assert_eq!(tree.get_item(12), Some(strings[2].clone()));
+        assert_eq!(tree.get_item(5), None);
+    }
+
+    #[test]
+    fn delete_two_from_far_left_with_merge() {
+        let mut tree = BTree::new();
+        let strings: Vec<String> = vec![
+            String::from("E"),
+            String::from("G"),
+            String::from("T"),
+            String::from("Q"),
+            String::from("F")
+        ];
+
+
+        tree.set_item(9, strings[0].clone());
+        tree.set_item(10, strings[1].clone());
+        tree.set_item(12, strings[2].clone());
+        tree.set_item(23, strings[3].clone());
+        tree.set_item(5, strings[4].clone());
+        // assert_eq!(tree.get_num_elements(), 4);
+        assert_eq!(tree.get_item(5), Some(strings[4].clone()));
+        assert_eq!(tree.get_item(9), Some(strings[0].clone()));
+        tree.remove(5);
+        tree.remove(9);
+        assert_eq!(tree.get_depth(), 1);
+        assert_eq!(tree.get_item(9), None);
+        assert_eq!(tree.get_item(23), Some(strings[3].clone()));
+        assert_eq!(tree.get_item(12), Some(strings[2].clone()));
+        assert_eq!(tree.get_item(5), None);
+    }
+    
+    
 }
