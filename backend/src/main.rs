@@ -18,9 +18,9 @@ fn main() {
     tree.set_item(12, strings[2].clone());
     tree.set_item(23, strings[3].clone());
     tree.set_item(5, strings[4].clone());
-    
-    assert_eq!(tree.get_depth(), 2);
+    // assert_eq!(tree.get_num_elements(), 4);
+
+    tree.print();
     tree.remove(5);
-    tree.remove(9);
     tree.print();
 }
