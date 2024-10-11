@@ -298,7 +298,7 @@ impl TreeNode {
                         // note that these take ownership (or should at least)
                         let mut index = x.index;
                         let mut data = x.data;
-                        
+
                         match index.last() {
                             None => {}
                             Some(x) => {
@@ -307,7 +307,7 @@ impl TreeNode {
                                 }
                             }
                         }
-                        
+
                         current_node.index.reverse();
                         current_node.data.reverse();
                         while let (Some(idx), Some(datum)) = (current_node.index.pop(), current_node.data.pop()) {
@@ -348,6 +348,53 @@ impl TreeNode {
         }
     }
 }
+
+trait NodeInterface {
+    fn reverse_data(&mut self);
+    fn pop_last_data_and_index(&mut self)-> Option<(IndexType, ChildType)>;
+
+    fn get_left_pointer(&self) -> Arc<Mutex<TreeNode>>;
+
+    fn get_right_pointer(&self) -> Arc<Mutex<TreeNode>>;
+    fn insert (&mut self, index: IndexType, datum: Data, loc: usize);
+    fn get_loc(&self, index: &IndexType) -> usize;
+}
+
+
+impl NodeInterface for LeafItem{
+    fn reverse_data(&mut self) {
+        self.index.reverse();
+        self.data.reverse();
+    }
+
+    fn pop_last_data_and_index(&mut self) -> Option<(IndexType, ChildType)> {
+        match (self.index.pop(), self.data.pop()) {
+            (Some(idx), Some(datum)) => {
+                Some((idx, Data(datum)))
+            }
+            (_, _) => {None}
+        }
+    }
+
+    fn get_left_pointer(&self) -> Arc<Mutex<TreeNode>> {
+        self.left_pointer.clone()
+    }
+
+    fn get_right_pointer(&self) -> Arc<Mutex<TreeNode>> {
+        self.right_pointer.clone()
+    }
+
+    fn insert (&mut self, index: IndexType, datum: Data, loc: usize) {
+        self.index.insert(loc, index);
+        self.data.insert(loc, datum);
+    }
+
+    fn get_loc(&self, index: &IndexType) -> usize {
+        binary_search_leafs(&self.index, &index, compare)
+    }
+
+}
+
 
 // Comparator returns true if l < r
 fn binary_search_leafs(data: &Vec<IndexType>, index: &IndexType, comparator: impl Fn(&IndexType, &IndexType) -> bool) -> usize {
@@ -390,22 +437,25 @@ fn compare(l: &IndexType, r: &IndexType) -> bool {
     l < r
 }
 
-fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataType) -> TreeNode {
-    let loc = binary_search_leafs(&leaf_item.index, &index, compare);
-    leaf_item.index.insert(loc, index);
-    leaf_item.data.insert(loc, data);
 
-    if (leaf_item.index.len() > ELEMENTS_PER_PAGE) {
+
+
+fn insert_into_leaf_node<T: NodeInterface>(mut item: T, index: IndexType, data: DataType) -> TreeNode {
+    let loc = item.get_loc(&index);
+    item.insert(index, data, loc);
+
+
+    if (item.index.len() > ELEMENTS_PER_PAGE) {
         let mut left = LeafItem::new();
         let mut right = LeafItem::new();
         let midpt = ELEMENTS_PER_PAGE.div_ceil(2);
-        let mid_idx = leaf_item.index.get(midpt).unwrap().clone();
+        let mid_idx = item.index.get(midpt).unwrap().clone();
 
-        leaf_item.index.reverse();
-        leaf_item.data.reverse();
+        item.index.reverse();
+        item.data.reverse();
 
-        while let (Some(idx), Some(datum)) = (leaf_item.index.pop(), leaf_item.data.pop()) {
-            let selected = if leaf_item.index.len() > midpt {
+        while let (Some(idx), Some(datum)) = (item.index.pop(), item.data.pop()) {
+            let selected = if item.index.len() > midpt {
                 &mut left
             } else {
                 &mut right
@@ -415,8 +465,8 @@ fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataTy
         }
 
         // Fix Pointers
-        left.left_pointer = leaf_item.left_pointer.clone();
-        right.right_pointer = leaf_item.right_pointer.clone();
+        left.left_pointer = item.left_pointer.clone();
+        right.right_pointer = item.right_pointer.clone();
 
         let left_wrapped = Arc::new(Mutex::new(LeafNode(left)));
         let right_wrapped = Arc::new(Mutex::new(LeafNode(right)));
@@ -425,11 +475,32 @@ fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataTy
         right_wrapped.lock().unwrap().set_left_pointer(left_wrapped.clone());
         left_wrapped.lock().unwrap().set_right_pointer(right_wrapped.clone());
 
-        leaf_item.left_pointer.lock().unwrap().set_right_pointer(left_wrapped.clone());
-        leaf_item.right_pointer.lock().unwrap().set_left_pointer(right_wrapped.clone());
+        item.left_pointer.lock().unwrap().set_right_pointer(left_wrapped.clone());
+        item.right_pointer.lock().unwrap().set_left_pointer(right_wrapped.clone());
         OverflowNode(left_wrapped, mid_idx, right_wrapped)
     } else {
-        LeafNode(leaf_item)
+        LeafNode(item)
+    }
+}
+
+fn insert_into_internal_item(mut internal_item: InternalItem, index: IndexType, data: DataType) -> TreeNode {
+    let loc = binary_search_leafs(&internal_item.index, &index, compare);
+    let mut node_ref = Null;
+    swap(internal_item.data[loc].lock().unwrap().deref_mut(), &mut node_ref);
+    match insert_item(node_ref, index, data) {
+        OverflowNode(l, idx, r) => {
+            internal_item.data[loc] = l;
+            internal_item.data.insert(loc + 1, r);
+            internal_item.index.insert(loc, idx);
+        }
+        mut x => {
+            swap(internal_item.data[loc].lock().unwrap().deref_mut(), &mut x);
+        }
+    }
+    if internal_item.data.len() > ELEMENTS_PER_PAGE {
+        split_internal_item(internal_item)
+    } else {
+        InternalNode(internal_item)
     }
 }
 
@@ -474,26 +545,7 @@ fn split_internal_item(mut internal_item: InternalItem) -> TreeNode {
 }
 
 
-fn insert_into_internal_item(mut internal_item: InternalItem, index: IndexType, data: DataType) -> TreeNode {
-    let loc = binary_search_leafs(&internal_item.index, &index, compare);
-    let mut node_ref = Null;
-    swap(internal_item.data[loc].lock().unwrap().deref_mut(), &mut node_ref);
-    match insert_item(node_ref, index, data) {
-        OverflowNode(l, idx, r) => {
-            internal_item.data[loc] = l;
-            internal_item.data.insert(loc + 1, r);
-            internal_item.index.insert(loc, idx);
-        }
-        mut x => {
-            swap(internal_item.data[loc].lock().unwrap().deref_mut(), &mut x);
-        }
-    }
-    if internal_item.data.len() > ELEMENTS_PER_PAGE {
-        split_internal_item(internal_item)
-    } else {
-        InternalNode(internal_item)
-    }
-}
+
 
 
 fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
@@ -1103,5 +1155,4 @@ mod tests {
         tree.print();
         tree.set_item(22, "A".to_string());
     }
-
 }
