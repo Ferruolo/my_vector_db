@@ -1,8 +1,11 @@
+use std::cmp::max;
 use crate::vector_b_tree::TreeNode::*;
 use std::fmt;
 use std::mem::swap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
+use libc::uid_t;
+use crate::vector_b_tree::ChildType::Data;
 
 const ELEMENTS_PER_PAGE: usize = 4;
 const MAX_LIVE_PAGES: usize = 8;
@@ -15,6 +18,7 @@ type IndexType = usize;
  * Base Functions
 */
 // Invariants:
+
 
 
 enum TreeNode {
@@ -59,6 +63,11 @@ impl InternalItem {
             right_pointer: Arc::new(Mutex::new(Null)),
         }
     }
+}
+
+enum ChildType {
+    Data(DataType),
+    Node(Arc<Mutex<TreeNode>>),
 }
 
 
@@ -148,9 +157,11 @@ impl TreeNode {
             }
             LeafNode(node) => {
                 accum.extend(node.data.clone());
-                node.right_pointer.lock().unwrap().iterate_through(accum)
+                node.right_pointer.clone().lock().unwrap().iterate_through(accum)
             }
-            _ => { accum }
+            _ => {
+                accum
+            }
         }
     }
 
@@ -187,30 +198,37 @@ impl TreeNode {
         }
     }
 
-    fn pass_right(&mut self) -> Option<(IndexType, DataType)> {
+    fn pass_right(&mut self) -> Option<(IndexType, ChildType)> {
         match self {
             Null => {
                 None
             }
-            InternalNode(_) => {
-                None
+            OverflowNode(_, _, _) => {
+                panic!("Overflow node should never be linked to")
             }
+
             LeafNode(x) => {
                 if x.index.len() <= ELEMENTS_PER_PAGE / 2 {
                     None
                 } else {
                     let (last_idx) = x.index.pop().unwrap();
                     let (last_data) = x.data.pop().unwrap();
-                    Some((last_idx, last_data))
+                    Some((last_idx, Data(last_data)))
                 }
             }
-            OverflowNode(_, _, _) => {
-                panic!("Overflow node should never be linked to")
+            InternalNode(x) => {
+                if x.index.len() <= ELEMENTS_PER_PAGE / 2 {
+                    None
+                } else {
+                    let (last_idx) = x.index.pop().unwrap();
+                    let (last_data) = x.data.pop().unwrap();
+                    Some((last_idx, ChildType::Node(last_data)))
+                }
             }
         }
     }
 
-    fn pass_left(&mut self) -> Option<(IndexType, DataType)> {
+    fn pass_left(&mut self) -> Option<(IndexType, ChildType)> {
         match self {
             Null => {
                 None
@@ -224,7 +242,7 @@ impl TreeNode {
                 } else {
                     let (last_idx) = x.index.remove(0);
                     let (last_data) = x.data.remove(0);
-                    Some((last_idx, last_data))
+                    Some((last_idx, Data(last_data)))
                 }
             }
             OverflowNode(_, _, _) => {
@@ -232,11 +250,24 @@ impl TreeNode {
             }
         }
     }
-    
+
     fn merge_from_right(&mut self, node: TreeNode) {
+        println!("Merge from right");
         match node {
-            InternalNode(x) => {
-                todo!();
+            InternalNode(mut x) => {
+                match self {
+                    InternalNode(current_node) => {
+                        while let (Some(idx), Some(datum)) = (x.index.pop(), x.data.pop()) {
+                            current_node.index.push(idx);
+                            current_node.data.push(datum);
+
+                        }
+                        current_node.right_pointer = x.right_pointer.clone();
+                        x.right_pointer.lock().unwrap().set_left_pointer(x.left_pointer.clone());
+
+                    }
+                    _ => {panic!("Can't merge internal nodes with non leaf internal")}
+                }
             }
             LeafNode(mut x) => {
                 match self {
@@ -244,10 +275,11 @@ impl TreeNode {
                         while let (Some(idx), Some(datum)) = (x.index.pop(), x.data.pop()) {
                             current_node.index.push(idx);
                             current_node.data.push(datum);
-                            current_node.right_pointer = x.right_pointer.clone();
-                            x.right_pointer.lock().unwrap().set_left_pointer(x.left_pointer.clone());
-                            x.left_pointer.lock().unwrap().set_right_pointer(x.right_pointer.clone());
+
                         }
+                        current_node.right_pointer = x.right_pointer.clone();
+                        x.right_pointer.lock().unwrap().set_left_pointer(x.left_pointer.clone());
+
                     }
                     _ => {panic!("Can't merge leaf nodes with non leaf nodes")}
                 }
@@ -258,9 +290,37 @@ impl TreeNode {
     }
 
     fn merge_from_left(&mut self, node: TreeNode) {
+        println!("Merge from left");
         match node {
             InternalNode(x) => {
-                todo!();
+                match self {
+                    InternalNode(current_node) => {
+                        // note that these take ownership (or should at least)
+                        let mut index = x.index;
+                        let mut data = x.data;
+                        
+                        match index.last() {
+                            None => {}
+                            Some(x) => {
+                                if *x == usize::max_value() {
+                                    index.pop();
+                                }
+                            }
+                        }
+                        
+                        current_node.index.reverse();
+                        current_node.data.reverse();
+                        while let (Some(idx), Some(datum)) = (current_node.index.pop(), current_node.data.pop()) {
+                            index.push(idx);
+                            data.push(datum);
+                        }
+                        current_node.index = index;
+                        current_node.data = data;
+                        current_node.left_pointer = x.left_pointer.clone();
+                        x.left_pointer.lock().unwrap().set_right_pointer(x.right_pointer.clone());
+                    }
+                    _ => {panic!("Can't merge internal nodes with non internal nodes")}
+                }
             }
             LeafNode(mut x) => {
                 match self {
@@ -268,12 +328,17 @@ impl TreeNode {
                         // note that these take ownership (or should at least)
                         let mut index = x.index;
                         let mut data = x.data;
+                        current_node.index.reverse();
+                        current_node.data.reverse();
                         while let (Some(idx), Some(datum)) = (current_node.index.pop(), current_node.data.pop()) {
                             index.push(idx);
                             data.push(datum);
                         }
+                        current_node.index = index;
+                        current_node.data = data;
+                        current_node.left_pointer = x.left_pointer.clone();
                         x.left_pointer.lock().unwrap().set_right_pointer(x.right_pointer.clone());
-                        x.right_pointer.lock().unwrap().set_left_pointer(x.left_pointer.clone());
+
                     }
                     _ => {panic!("Can't merge leaf nodes with non leaf nodes")}
                 }
@@ -338,7 +403,7 @@ fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataTy
 
         leaf_item.index.reverse();
         leaf_item.data.reverse();
-        
+
         while let (Some(idx), Some(datum)) = (leaf_item.index.pop(), leaf_item.data.pop()) {
             let selected = if leaf_item.index.len() > midpt {
                 &mut left
@@ -354,17 +419,14 @@ fn insert_into_leaf_node(mut leaf_item: LeafItem, index: IndexType, data: DataTy
         right.right_pointer = leaf_item.right_pointer.clone();
 
         let left_wrapped = Arc::new(Mutex::new(LeafNode(left)));
-
-        right.left_pointer = left_wrapped.clone();
         let right_wrapped = Arc::new(Mutex::new(LeafNode(right)));
 
         // This is pretty awkward, please fix?
-        match left_wrapped.lock().unwrap().deref_mut() {
-            LeafNode(x) => {
-                x.right_pointer = right_wrapped.clone();
-            }
-            _ => panic!(""),
-        }
+        right_wrapped.lock().unwrap().set_left_pointer(left_wrapped.clone());
+        left_wrapped.lock().unwrap().set_right_pointer(right_wrapped.clone());
+
+        leaf_item.left_pointer.lock().unwrap().set_right_pointer(left_wrapped.clone());
+        leaf_item.right_pointer.lock().unwrap().set_left_pointer(right_wrapped.clone());
         OverflowNode(left_wrapped, mid_idx, right_wrapped)
     } else {
         LeafNode(leaf_item)
@@ -461,7 +523,7 @@ impl fmt::Display for TreeNode {
 
 fn delete_from_leaf_item(mut node: LeafItem, index: IndexType) -> TreeNode {
     let loc = binary_search_leafs(&node.index, &index, compare);
-    if (loc < node.index.len() && node.index[loc] == index) {
+    if loc < node.index.len() && node.index[loc] == index {
         node.index.remove(loc);
         node.data.remove(loc);
 
@@ -469,20 +531,31 @@ fn delete_from_leaf_item(mut node: LeafItem, index: IndexType) -> TreeNode {
             return Null;
         } else if node.index.len() < ELEMENTS_PER_PAGE / 2 {
             // merge if underfull
-            
-            
-            
             if let Some((new_idx, new_datum)) = node.left_pointer.clone().lock().unwrap().pass_right() {
                 // Try to take from left
                 node.index.insert(0, new_idx);
-                node.data.insert(0, new_datum);
-                LeafNode(node)
-            } else if let Some((new_idx, new_datum)) = node.right_pointer.clone().lock().unwrap().pass_left() {
+                node.data.insert(0, match new_datum {
+                    Data(x) => {x}
+                    ChildType::Node(_) => {
+                        panic!("Internal links to a leaf node")
+                    }
+                });
+                return LeafNode(node)
+            }
+
+            if let Some((new_idx, new_datum)) = node.right_pointer.clone().lock().unwrap().pass_left() {
                 // Try to take from right
                 node.index.push(new_idx);
-                node.data.push(new_datum);
-                LeafNode(node)
-            } else if !node.left_pointer.lock().unwrap().is_null() {
+                node.data.push(match new_datum {
+                    Data(x) => {x}
+                    ChildType::Node(_) => {
+                        panic!("Internal links to a leaf node")
+                    }
+                });
+                return LeafNode(node)
+            }
+
+            if !node.left_pointer.clone().lock().unwrap().is_null() {
                 // Merge to Left
                 node.left_pointer.clone().lock().unwrap().merge_from_right(LeafNode(node));
                 Null
@@ -490,11 +563,7 @@ fn delete_from_leaf_item(mut node: LeafItem, index: IndexType) -> TreeNode {
                 node.right_pointer.clone().lock().unwrap().merge_from_left(LeafNode(node));
                 Null
             } else {
-                if (node.index.is_empty()) {
-                    Null
-                } else {
-                    LeafNode(node)
-                }
+                LeafNode(node)
             }
         } else {
             LeafNode(node)
@@ -509,17 +578,24 @@ fn delete_from_internal_node(mut node: InternalItem, index: IndexType) -> TreeNo
     let loc = binary_search_internal_nodes(&node.index, &index, compare);
     let mut selected_child = Null;
 
-    if (loc >= node.index.len()) {
+    if loc >= node.index.len() {
         return InternalNode(node);
     }
     swap(&mut selected_child, node.data[loc].lock().unwrap().deref_mut());
     match delete_item(selected_child, index) {
         Null => {
             node.data.remove(loc);
-            node.index.remove(loc);
+
+            node.index.remove(max(loc, 1) - 1);
         }
-        InternalNode(_) => {}
+        InternalNode(x) => {
+            selected_child = InternalNode(x);
+            swap(&mut selected_child, node.data[loc].lock().unwrap().deref_mut());
+        }
         LeafNode(x) => {
+            if (node.index.len() > 1 && loc > 0 && *x.index.first().unwrap() < node.index[loc - 1]) {
+                node.index[loc - 1] = *x.index.first().unwrap();
+            }
             selected_child = LeafNode(x);
             swap(&mut selected_child, node.data[loc].lock().unwrap().deref_mut());
         }
@@ -528,8 +604,47 @@ fn delete_from_internal_node(mut node: InternalItem, index: IndexType) -> TreeNo
         }
     }
 
+    if node.data.len() < ELEMENTS_PER_PAGE / 2 {
+        // merge if underfull
+        if let Some((new_idx, new_datum)) = node.left_pointer.clone().lock().unwrap().pass_right() {
+            // Try to take from left
+            node.index.insert(0, new_idx);
+            node.data.insert(0, match new_datum {
+                Data(_) => {panic!("Internal links to a leaf node")}
+                ChildType::Node(x) => {x}
+            });
+            return InternalNode(node)
+        }
 
-    InternalNode(node)
+        if let Some((new_idx, new_datum)) = node.right_pointer.clone().lock().unwrap().pass_left() {
+            // Try to take from right
+            node.index.push(new_idx);
+            node.data.push(match new_datum {
+                Data(_) => {panic!("Internal links to a leaf node")}
+                ChildType::Node(x) => {x}
+            });
+            return InternalNode(node)
+        }
+
+        if !node.left_pointer.clone().lock().unwrap().is_null() {
+            // Merge to Left
+            node.left_pointer.clone().lock().unwrap().merge_from_right(InternalNode(node));
+            Null
+        } else if !node.right_pointer.lock().unwrap().is_null() {
+            node.right_pointer.clone().lock().unwrap().merge_from_left(InternalNode(node));
+            Null
+        } else {
+            if (node.data.len() == 1) {
+                let mut child = Null;
+                swap(&mut child, node.data[0].lock().unwrap().deref_mut());
+                child
+            } else {
+                InternalNode(node)
+            }
+        }
+    } else {
+        InternalNode(node)
+    }
 }
 
 
@@ -807,7 +922,6 @@ mod tests {
         tree.set_item(1, strings[12].clone());
         tree.set_item(50, strings[13].clone());
         tree.set_item(55, strings[14].clone());
-        tree.print();
 
         let values: Vec<DataType> = vec![
             "H", "L", "B",
@@ -820,6 +934,7 @@ mod tests {
 
 
         let iterate = tree.iterate_through();
+        assert_eq!(iterate.len(), values.len());
         for (left, right) in values.iter().zip(iterate) {
             assert_eq!(*left, right);
         }
@@ -912,34 +1027,81 @@ mod tests {
         assert_eq!(tree.get_item(12), Some(strings[2].clone()));
         assert_eq!(tree.get_item(5), None);
     }
-    //
-    // #[test]
-    // fn delete_two_from_far_left_with_merge() {
-    //     let mut tree = BTree::new();
-    //     let strings: Vec<String> = vec![
-    //         String::from("E"),
-    //         String::from("G"),
-    //         String::from("T"),
-    //         String::from("Q"),
-    //         String::from("F")
-    //     ];
-    //
-    //     tree.set_item(9, strings[0].clone());
-    //     tree.set_item(10, strings[1].clone());
-    //     tree.set_item(12, strings[2].clone());
-    //     tree.set_item(23, strings[3].clone());
-    //     tree.set_item(5, strings[4].clone());
-    //     // assert_eq!(tree.get_num_elements(), 4);
-    //     assert_eq!(tree.get_item(5), Some(strings[4].clone()));
-    //     assert_eq!(tree.get_item(9), Some(strings[0].clone()));
-    //     tree.remove(5);
-    //     tree.remove(9);
-    //     assert_eq!(tree.get_depth(), 1);
-    //     assert_eq!(tree.get_item(9), None);
-    //     assert_eq!(tree.get_item(23), Some(strings[3].clone()));
-    //     assert_eq!(tree.get_item(12), Some(strings[2].clone()));
-    //     assert_eq!(tree.get_item(5), None);
-    // }
-    //
+
+    #[test]
+    fn delete_two_from_far_left_with_merge() {
+        let mut tree = BTree::new();
+        let strings: Vec<String> = vec![
+            String::from("E"),
+            String::from("G"),
+            String::from("T"),
+            String::from("Q"),
+            String::from("F")
+        ];
+
+        tree.set_item(9, strings[0].clone());
+        tree.set_item(10, strings[1].clone());
+        tree.set_item(12, strings[2].clone());
+        tree.set_item(23, strings[3].clone());
+        tree.set_item(5, strings[4].clone());
+        // assert_eq!(tree.get_num_elements(), 4);
+        assert_eq!(tree.get_item(5), Some(strings[4].clone()));
+        assert_eq!(tree.get_item(9), Some(strings[0].clone()));
+        tree.remove(5);
+        tree.remove(9);
+        assert_eq!(tree.get_depth(), 1);
+        assert_eq!(tree.get_item(9), None);
+        assert_eq!(tree.get_item(23), Some(strings[3].clone()));
+        assert_eq!(tree.get_item(12), Some(strings[2].clone()));
+        assert_eq!(tree.get_item(5), None);
+    }
+
+    #[test]
+    fn something_i_found() {
+        let mut tree = BTree::new();
+        let strings: Vec<String> = vec![
+            String::from("E"),
+            String::from("G"),
+            String::from("T"),
+            String::from("Q"),
+            String::from("F"),
+            String::from("B"),
+            String::from("A"),
+            String::from("A"),
+            String::from("F"),
+            String::from("V"),
+            String::from("V"),
+            String::from("H"),
+            String::from("L"),
+            String::from("Alpha"),
+            String::from("Omega"),
+        ];
+
+        tree.set_item(9, strings[0].clone());
+        tree.set_item(10, strings[1].clone());
+        tree.set_item(12, strings[2].clone());
+        tree.set_item(23, strings[3].clone());
+        tree.set_item(5, strings[4].clone());
+        tree.set_item(2, strings[5].clone());
+        tree.set_item(7, strings[6].clone());
+        tree.set_item(38, strings[7].clone());
+        tree.set_item(39, strings[8].clone());
+        tree.set_item(40, strings[9].clone());
+        tree.set_item(45, strings[10].clone());
+
+        tree.set_item(0, strings[11].clone());
+        tree.set_item(1, strings[12].clone());
+        tree.set_item(50, strings[13].clone());
+        tree.set_item(55, strings[14].clone());
+
+        tree.print();
+        tree.remove(5);
+        tree.remove(9);
+        tree.print();
+        tree.remove(10);
+        tree.remove(7);
+        tree.print();
+        tree.set_item(22, "A".to_string());
+    }
 
 }
