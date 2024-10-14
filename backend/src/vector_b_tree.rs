@@ -35,34 +35,11 @@ struct LeafItem {
     right_pointer: Arc<Mutex<TreeNode>>,
 }
 
-
-impl LeafItem {
-    fn new() -> Self {
-        Self {
-            index: vec![],
-            data: vec![],
-            left_pointer: Arc::new(Mutex::new(Null)),
-            right_pointer: Arc::new(Mutex::new(Null)),
-        }
-    }
-}
-
 struct InternalItem {
     index: Vec<IndexType>,
     data: Vec<Arc<Mutex<TreeNode>>>,
     left_pointer: Arc<Mutex<TreeNode>>,
     right_pointer: Arc<Mutex<TreeNode>>,
-}
-
-impl InternalItem {
-    fn new() -> Self {
-        Self {
-            index: vec![],
-            data: vec![],
-            left_pointer: Arc::new(Mutex::new(Null)),
-            right_pointer: Arc::new(Mutex::new(Null)),
-        }
-    }
 }
 
 enum ChildType {
@@ -350,18 +327,41 @@ impl TreeNode {
 }
 
 trait NodeInterface {
+    fn new() -> Self;
     fn reverse_data(&mut self);
     fn pop_last_data_and_index(&mut self)-> Option<(IndexType, ChildType)>;
 
     fn get_left_pointer(&self) -> Arc<Mutex<TreeNode>>;
 
     fn get_right_pointer(&self) -> Arc<Mutex<TreeNode>>;
-    fn insert (&mut self, index: IndexType, datum: Data, loc: usize);
+    fn insert (&mut self, index: IndexType, datum: ChildType, loc: usize);
     fn get_loc(&self, index: &IndexType) -> usize;
+    fn get_midpoint_idx(&self) -> IndexType;
+
+    fn get_index_len(&self) -> usize;
+
+    fn push(&mut self, index: IndexType, datum: ChildType);
+
+    fn push_last_element(&mut self);
+
+    fn create_pointer(item: Box<Self>) -> Arc<Mutex<TreeNode>>;
+
+    fn set_left_pointer(&mut self, ptr: Arc<Mutex<TreeNode>>);
+
+    fn set_right_pointer(&mut self, ptr: Arc<Mutex<TreeNode>>);
 }
 
 
 impl NodeInterface for LeafItem{
+    fn new() -> Self {
+        Self {
+            index: vec![],
+            data: vec![],
+            left_pointer: Arc::new(Mutex::new(Null)),
+            right_pointer: Arc::new(Mutex::new(Null)),
+        }
+    }
+
     fn reverse_data(&mut self) {
         self.index.reverse();
         self.data.reverse();
@@ -384,15 +384,126 @@ impl NodeInterface for LeafItem{
         self.right_pointer.clone()
     }
 
-    fn insert (&mut self, index: IndexType, datum: Data, loc: usize) {
+    fn insert (&mut self, index: IndexType, datum: ChildType, loc: usize) {
         self.index.insert(loc, index);
-        self.data.insert(loc, datum);
+        self.data.insert(loc, match datum {
+            Data(x) => {x}
+            ChildType::Node(_) => {panic!("Tried to insert node into data")}
+        });
     }
 
     fn get_loc(&self, index: &IndexType) -> usize {
         binary_search_leafs(&self.index, &index, compare)
     }
 
+    fn get_midpoint_idx(&self) -> IndexType {
+        self.index[self.get_index_len().div_ceil(2)]
+    }
+
+    fn get_index_len(&self) -> usize {
+        self.index.len()
+    }
+
+    fn push(&mut self, index: IndexType, datum: ChildType) {
+        self.index.push(index);
+        self.data.push(match datum {
+            Data(x) => {x}
+            ChildType::Node(_) => {panic!("Tried to push node into data")}
+        });
+    }
+
+    fn push_last_element(&mut self) {
+        ()
+    }
+
+    fn create_pointer(item: Box<Self>) -> Arc<Mutex<TreeNode>> {
+        Arc::new(Mutex::new(LeafNode(*item)))
+    }
+
+    fn set_left_pointer(&mut self, ptr: Arc<Mutex<TreeNode>>) {
+        self.left_pointer = ptr.clone();
+    }
+
+    fn set_right_pointer(&mut self, ptr: Arc<Mutex<TreeNode>>) {
+        self.right_pointer = ptr.clone();
+    }
+}
+
+impl NodeInterface for InternalItem{
+    fn new() -> Self {
+        Self {
+            index: vec![],
+            data: vec![],
+            left_pointer: Arc::new(Mutex::new(Null)),
+            right_pointer: Arc::new(Mutex::new(Null)),
+        }
+    }
+
+    fn reverse_data(&mut self) {
+        self.index.reverse();
+        self.data.reverse();
+    }
+
+    fn pop_last_data_and_index(&mut self) -> Option<(IndexType, ChildType)> {
+        match (self.index.pop(), self.data.pop()) {
+            (Some(idx), Some(datum)) => {
+                Some((idx, ChildType::Node(datum)))
+            }
+            (_, _) => {None}
+        }
+    }
+
+    fn get_left_pointer(&self) -> Arc<Mutex<TreeNode>> {
+        self.left_pointer.clone()
+    }
+
+    fn get_right_pointer(&self) -> Arc<Mutex<TreeNode>> {
+        self.right_pointer.clone()
+    }
+
+    fn insert(&mut self, index: IndexType, datum: ChildType, loc: usize) {
+        self.index.insert(loc, index);
+        self.data.insert(loc, match datum {
+            Data(_) => {panic!("Can't insert node into data")}
+            ChildType::Node(x) => {x}
+        })
+    }
+
+    fn get_loc(&self, index: &IndexType) -> usize {
+        return binary_search_internal_nodes(&self.index, &index, compare);
+    }
+
+    fn get_midpoint_idx(&self) -> IndexType {
+        self.index.len().div_ceil(2)
+    }
+
+    fn get_index_len(&self) -> usize {
+        self.index.len()
+    }
+
+    fn push(&mut self, index: IndexType, datum: ChildType) {
+        self.index.push(index);
+        self.data.push(match datum {
+            Data(_) => {panic!("Tried to push data into node")}
+            ChildType::Node(x) => {x}
+        })
+    }
+
+    fn push_last_element(&mut self) {
+        self.index.push(usize::max_value());
+    }
+
+    fn create_pointer(item: Box<Self>) -> Arc<Mutex<TreeNode>> {
+        Arc::new(Mutex::new(InternalNode(*item)))
+    }
+
+    fn set_left_pointer(&mut self, ptr: Arc<Mutex<TreeNode>>) {
+        self.left_pointer = ptr.clone();
+    }
+
+    fn set_right_pointer(&mut self, ptr: Arc<Mutex<TreeNode>>) {
+        self.right_pointer = ptr.clone();
+    }
 }
 
 
@@ -437,47 +548,12 @@ fn compare(l: &IndexType, r: &IndexType) -> bool {
     l < r
 }
 
-
-
-
-fn insert_into_leaf_node<T: NodeInterface>(mut item: T, index: IndexType, data: DataType) -> TreeNode {
+fn insert_into_leaf_node(mut item: LeafItem, index: IndexType, data: DataType) -> TreeNode {
     let loc = item.get_loc(&index);
-    item.insert(index, data, loc);
-
+    item.insert(index, Data(data), loc);
 
     if (item.index.len() > ELEMENTS_PER_PAGE) {
-        let mut left = LeafItem::new();
-        let mut right = LeafItem::new();
-        let midpt = ELEMENTS_PER_PAGE.div_ceil(2);
-        let mid_idx = item.index.get(midpt).unwrap().clone();
-
-        item.index.reverse();
-        item.data.reverse();
-
-        while let (Some(idx), Some(datum)) = (item.index.pop(), item.data.pop()) {
-            let selected = if item.index.len() > midpt {
-                &mut left
-            } else {
-                &mut right
-            };
-            selected.index.push(idx);
-            selected.data.push(datum);
-        }
-
-        // Fix Pointers
-        left.left_pointer = item.left_pointer.clone();
-        right.right_pointer = item.right_pointer.clone();
-
-        let left_wrapped = Arc::new(Mutex::new(LeafNode(left)));
-        let right_wrapped = Arc::new(Mutex::new(LeafNode(right)));
-
-        // This is pretty awkward, please fix?
-        right_wrapped.lock().unwrap().set_left_pointer(left_wrapped.clone());
-        left_wrapped.lock().unwrap().set_right_pointer(right_wrapped.clone());
-
-        item.left_pointer.lock().unwrap().set_right_pointer(left_wrapped.clone());
-        item.right_pointer.lock().unwrap().set_left_pointer(right_wrapped.clone());
-        OverflowNode(left_wrapped, mid_idx, right_wrapped)
+        split_item(item)
     } else {
         LeafNode(item)
     }
@@ -498,49 +574,48 @@ fn insert_into_internal_item(mut internal_item: InternalItem, index: IndexType, 
         }
     }
     if internal_item.data.len() > ELEMENTS_PER_PAGE {
-        split_internal_item(internal_item)
+        split_item(internal_item)
     } else {
         InternalNode(internal_item)
     }
 }
 
-fn split_internal_item(mut internal_item: InternalItem) -> TreeNode {
-    let mut left = InternalItem::new();
-    let mut right = InternalItem::new();
+fn split_item<T: NodeInterface>(mut item: T) -> TreeNode {
+    let mut left = T::new();
+    let mut right = T::new();
     let midpt = ELEMENTS_PER_PAGE.div_ceil(2);
-    let mid_idx = internal_item.index.get(midpt).unwrap().clone();
+    let mid_idx = item.get_midpoint_idx();
 
-    internal_item.index.reverse();
-    internal_item.data.reverse();
-
+    item.reverse_data();
 
     // Duplicated from above, pls fix thanks
-    while let (Some(idx), Some(datum)) = (internal_item.index.pop(), internal_item.data.pop()) {
-        let selected = if internal_item.index.len() < midpt {
+    while let Some((idx, datum)) = item.pop_last_data_and_index() {
+        let selected = if item.get_index_len() < midpt {
             &mut right
         } else {
             &mut left
         };
-        selected.index.push(idx);
-        selected.data.push(datum);
+        selected.push(idx, datum)
     }
-    left.index.push(usize::max_value());
+    item.push_last_element();
     // Fix Pointers
-    left.left_pointer = internal_item.left_pointer.clone();
-    right.right_pointer = internal_item.right_pointer.clone();
 
-    let left_wrapped = Arc::new(Mutex::new(InternalNode(left)));
+    let cur_left_pointer = item.get_left_pointer();
+    let cur_right_pointer = item.get_right_pointer();
 
-    right.left_pointer = left_wrapped.clone();
-    let right_wrapped = Arc::new(Mutex::new(InternalNode(right)));
+    left.set_left_pointer(cur_left_pointer.clone());
+    right.set_right_pointer(cur_right_pointer.clone());
 
-    // This is pretty awkward, please fix?
-    match left_wrapped.lock().unwrap().deref_mut() {
-        InternalNode(x) => {
-            x.right_pointer = right_wrapped.clone();
-        }
-        _ => panic!(""),
-    }
+
+    let left_wrapped = T::create_pointer(Box::new(left));
+    let right_wrapped = T::create_pointer(Box::new(right));
+
+
+    cur_left_pointer.lock().unwrap().set_right_pointer(left_wrapped.clone());
+    cur_right_pointer.lock().unwrap().set_left_pointer(right_wrapped.clone());
+
+
+
     OverflowNode(left_wrapped, mid_idx, right_wrapped)
 }
 

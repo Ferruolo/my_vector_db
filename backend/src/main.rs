@@ -27,28 +27,28 @@ fn main() {
     tree.set_item(12, strings[2].clone());
     tree.set_item(23, strings[3].clone());
     tree.set_item(5, strings[4].clone());
-    tree.set_item(2, strings[5].clone());
-    tree.set_item(7, strings[6].clone());
-    tree.set_item(38, strings[7].clone());
-    tree.set_item(39, strings[8].clone());
-    tree.set_item(40, strings[9].clone());
-    tree.set_item(45, strings[10].clone());
-
-    tree.set_item(0, strings[11].clone());
-    tree.set_item(1, strings[12].clone());
-    tree.set_item(50, strings[13].clone());
-    tree.set_item(55, strings[14].clone());
-
-    tree.print();
-    tree.remove(5);
-    tree.remove(9);
-    tree.print();
-    tree.remove(10);
-    tree.remove(7);
-    tree.print();
-    tree.set_item(22, "A".to_string());
-    tree.remove(12);
-    tree.print();
-    tree.remove(2);
+    // tree.set_item(2, strings[5].clone());
+    // tree.set_item(7, strings[6].clone());
+    // tree.set_item(38, strings[7].clone());
+    // tree.set_item(39, strings[8].clone());
+    // tree.set_item(40, strings[9].clone());
+    // tree.set_item(45, strings[10].clone());
+    //
+    // tree.set_item(0, strings[11].clone());
+    // tree.set_item(1, strings[12].clone());
+    // tree.set_item(50, strings[13].clone());
+    // tree.set_item(55, strings[14].clone());
+    //
+    // tree.print();
+    // tree.remove(5);
+    // tree.remove(9);
+    // tree.print();
+    // tree.remove(10);
+    // tree.remove(7);
+    // tree.print();
+    // tree.set_item(22, "A".to_string());
+    // tree.remove(12);
+    // tree.print();
+    // tree.remove(2);
     tree.print();
 }
