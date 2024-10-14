@@ -1,11 +1,10 @@
-use std::cmp::max;
+use crate::vector_b_tree::ChildType::Data;
 use crate::vector_b_tree::TreeNode::*;
+use std::cmp::max;
 use std::fmt;
 use std::mem::swap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
-use libc::uid_t;
-use crate::vector_b_tree::ChildType::Data;
 
 const ELEMENTS_PER_PAGE: usize = 4;
 const MAX_LIVE_PAGES: usize = 8;
@@ -17,10 +16,7 @@ type IndexType = usize;
 /*
  * Base Functions
 */
-// Invariants:
-
-
-
+// Invariants:+
 enum TreeNode {
     Null,
     InternalNode(InternalItem),
@@ -229,40 +225,10 @@ impl TreeNode {
     }
 
     fn merge_from_right(&mut self, node: TreeNode) {
-        println!("Merge from right");
-        match node {
-            InternalNode(mut x) => {
-                match self {
-                    InternalNode(current_node) => {
-                        while let (Some(idx), Some(datum)) = (x.index.pop(), x.data.pop()) {
-                            current_node.index.push(idx);
-                            current_node.data.push(datum);
-
-                        }
-                        current_node.right_pointer = x.right_pointer.clone();
-                        x.right_pointer.lock().unwrap().set_left_pointer(x.left_pointer.clone());
-
-                    }
-                    _ => {panic!("Can't merge internal nodes with non leaf internal")}
-                }
-            }
-            LeafNode(mut x) => {
-                match self {
-                    LeafNode(current_node) => {
-                        while let (Some(idx), Some(datum)) = (x.index.pop(), x.data.pop()) {
-                            current_node.index.push(idx);
-                            current_node.data.push(datum);
-
-                        }
-                        current_node.right_pointer = x.right_pointer.clone();
-                        x.right_pointer.lock().unwrap().set_left_pointer(x.left_pointer.clone());
-
-                    }
-                    _ => {panic!("Can't merge leaf nodes with non leaf nodes")}
-                }
-            }
-            Null => {}
-            _ => {panic!("Can't merge an overflow using merge_from_right")}
+        match (self, node) {
+            (LeafNode(left), LeafNode(right)) => { merge_from_right(left, right) }
+            (InternalNode(left), InternalNode(right)) => { merge_from_right(left, right) }
+            (_, _) => { panic!("Invalid merge attempted") }
         }
     }
 
@@ -296,7 +262,7 @@ impl TreeNode {
                         current_node.left_pointer = x.left_pointer.clone();
                         x.left_pointer.lock().unwrap().set_right_pointer(x.right_pointer.clone());
                     }
-                    _ => {panic!("Can't merge internal nodes with non internal nodes")}
+                    _ => { panic!("Can't merge internal nodes with non internal nodes") }
                 }
             }
             LeafNode(mut x) => {
@@ -315,13 +281,12 @@ impl TreeNode {
                         current_node.data = data;
                         current_node.left_pointer = x.left_pointer.clone();
                         x.left_pointer.lock().unwrap().set_right_pointer(x.right_pointer.clone());
-
                     }
-                    _ => {panic!("Can't merge leaf nodes with non leaf nodes")}
+                    _ => { panic!("Can't merge leaf nodes with non leaf nodes") }
                 }
             }
             Null => {}
-            _ => {panic!("Can't merge an overflow using merge_from_right")}
+            _ => { panic!("Can't merge an overflow using merge_from_right") }
         }
     }
 }
@@ -329,12 +294,12 @@ impl TreeNode {
 trait NodeInterface {
     fn new() -> Self;
     fn reverse_data(&mut self);
-    fn pop_last_data_and_index(&mut self)-> Option<(IndexType, ChildType)>;
+    fn pop_last_data_and_index(&mut self) -> Option<(IndexType, ChildType)>;
 
     fn get_left_pointer(&self) -> Arc<Mutex<TreeNode>>;
 
     fn get_right_pointer(&self) -> Arc<Mutex<TreeNode>>;
-    fn insert (&mut self, index: IndexType, datum: ChildType, loc: usize);
+    fn insert(&mut self, index: IndexType, datum: ChildType, loc: usize);
     fn get_loc(&self, index: &IndexType) -> usize;
     fn get_midpoint_idx(&self) -> IndexType;
 
@@ -352,7 +317,7 @@ trait NodeInterface {
 }
 
 
-impl NodeInterface for LeafItem{
+impl NodeInterface for LeafItem {
     fn new() -> Self {
         Self {
             index: vec![],
@@ -372,7 +337,7 @@ impl NodeInterface for LeafItem{
             (Some(idx), Some(datum)) => {
                 Some((idx, Data(datum)))
             }
-            (_, _) => {None}
+            (_, _) => { None }
         }
     }
 
@@ -384,11 +349,11 @@ impl NodeInterface for LeafItem{
         self.right_pointer.clone()
     }
 
-    fn insert (&mut self, index: IndexType, datum: ChildType, loc: usize) {
+    fn insert(&mut self, index: IndexType, datum: ChildType, loc: usize) {
         self.index.insert(loc, index);
         self.data.insert(loc, match datum {
-            Data(x) => {x}
-            ChildType::Node(_) => {panic!("Tried to insert node into data")}
+            Data(x) => { x }
+            ChildType::Node(_) => { panic!("Tried to insert node into data") }
         });
     }
 
@@ -407,8 +372,8 @@ impl NodeInterface for LeafItem{
     fn push(&mut self, index: IndexType, datum: ChildType) {
         self.index.push(index);
         self.data.push(match datum {
-            Data(x) => {x}
-            ChildType::Node(_) => {panic!("Tried to push node into data")}
+            Data(x) => { x }
+            ChildType::Node(_) => { panic!("Tried to push node into data") }
         });
     }
 
@@ -429,7 +394,7 @@ impl NodeInterface for LeafItem{
     }
 }
 
-impl NodeInterface for InternalItem{
+impl NodeInterface for InternalItem {
     fn new() -> Self {
         Self {
             index: vec![],
@@ -449,7 +414,7 @@ impl NodeInterface for InternalItem{
             (Some(idx), Some(datum)) => {
                 Some((idx, ChildType::Node(datum)))
             }
-            (_, _) => {None}
+            (_, _) => { None }
         }
     }
 
@@ -464,8 +429,8 @@ impl NodeInterface for InternalItem{
     fn insert(&mut self, index: IndexType, datum: ChildType, loc: usize) {
         self.index.insert(loc, index);
         self.data.insert(loc, match datum {
-            Data(_) => {panic!("Can't insert node into data")}
-            ChildType::Node(x) => {x}
+            Data(_) => { panic!("Can't insert node into data") }
+            ChildType::Node(x) => { x }
         })
     }
 
@@ -484,8 +449,8 @@ impl NodeInterface for InternalItem{
     fn push(&mut self, index: IndexType, datum: ChildType) {
         self.index.push(index);
         self.data.push(match datum {
-            Data(_) => {panic!("Tried to push data into node")}
-            ChildType::Node(x) => {x}
+            Data(_) => { panic!("Tried to push data into node") }
+            ChildType::Node(x) => { x }
         })
     }
 
@@ -598,7 +563,6 @@ fn split_item<T: NodeInterface>(mut item: T) -> TreeNode {
         selected.push(idx, datum)
     }
     item.push_last_element();
-    // Fix Pointers
 
     let cur_left_pointer = item.get_left_pointer();
     let cur_right_pointer = item.get_right_pointer();
@@ -606,21 +570,23 @@ fn split_item<T: NodeInterface>(mut item: T) -> TreeNode {
     left.set_left_pointer(cur_left_pointer.clone());
     right.set_right_pointer(cur_right_pointer.clone());
 
-
     let left_wrapped = T::create_pointer(Box::new(left));
     let right_wrapped = T::create_pointer(Box::new(right));
 
-
     cur_left_pointer.lock().unwrap().set_right_pointer(left_wrapped.clone());
     cur_right_pointer.lock().unwrap().set_left_pointer(right_wrapped.clone());
-
-
 
     OverflowNode(left_wrapped, mid_idx, right_wrapped)
 }
 
 
-
+fn merge_from_right<T: NodeInterface>(left: &mut T, mut right: T) {
+    while let Some((idx, datum)) = right.pop_last_data_and_index() {
+        left.push(idx, datum);
+    }
+    left.set_right_pointer(right.get_right_pointer().clone());
+    right.get_right_pointer().lock().unwrap().set_left_pointer(right.get_left_pointer().clone());
+}
 
 
 fn insert_item(node: TreeNode, index: IndexType, data: DataType) -> TreeNode {
@@ -648,6 +614,7 @@ impl fmt::Display for TreeNode {
     }
 }
 
+
 fn delete_from_leaf_item(mut node: LeafItem, index: IndexType) -> TreeNode {
     let loc = binary_search_leafs(&node.index, &index, compare);
     if loc < node.index.len() && node.index[loc] == index {
@@ -662,24 +629,24 @@ fn delete_from_leaf_item(mut node: LeafItem, index: IndexType) -> TreeNode {
                 // Try to take from left
                 node.index.insert(0, new_idx);
                 node.data.insert(0, match new_datum {
-                    Data(x) => {x}
+                    Data(x) => { x }
                     ChildType::Node(_) => {
                         panic!("Internal links to a leaf node")
                     }
                 });
-                return LeafNode(node)
+                return LeafNode(node);
             }
 
             if let Some((new_idx, new_datum)) = node.right_pointer.clone().lock().unwrap().pass_left() {
                 // Try to take from right
                 node.index.push(new_idx);
                 node.data.push(match new_datum {
-                    Data(x) => {x}
+                    Data(x) => { x }
                     ChildType::Node(_) => {
                         panic!("Internal links to a leaf node")
                     }
                 });
-                return LeafNode(node)
+                return LeafNode(node);
             }
 
             if !node.left_pointer.clone().lock().unwrap().is_null() {
@@ -737,20 +704,20 @@ fn delete_from_internal_node(mut node: InternalItem, index: IndexType) -> TreeNo
             // Try to take from left
             node.index.insert(0, new_idx);
             node.data.insert(0, match new_datum {
-                Data(_) => {panic!("Internal links to a leaf node")}
-                ChildType::Node(x) => {x}
+                Data(_) => { panic!("Internal links to a leaf node") }
+                ChildType::Node(x) => { x }
             });
-            return InternalNode(node)
+            return InternalNode(node);
         }
 
         if let Some((new_idx, new_datum)) = node.right_pointer.clone().lock().unwrap().pass_left() {
             // Try to take from right
             node.index.push(new_idx);
             node.data.push(match new_datum {
-                Data(_) => {panic!("Internal links to a leaf node")}
-                ChildType::Node(x) => {x}
+                Data(_) => { panic!("Internal links to a leaf node") }
+                ChildType::Node(x) => { x }
             });
-            return InternalNode(node)
+            return InternalNode(node);
         }
 
         if !node.left_pointer.clone().lock().unwrap().is_null() {
