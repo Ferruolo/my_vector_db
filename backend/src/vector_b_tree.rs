@@ -166,54 +166,19 @@ impl TreeNode {
 
     fn pass_right(&mut self) -> Option<(IndexType, ChildType)> {
         match self {
-            Null => {
-                None
-            }
-            OverflowNode(_, _, _) => {
-                panic!("Overflow node should never be linked to")
-            }
-
-            LeafNode(x) => {
-                if x.index.len() <= ELEMENTS_PER_PAGE / 2 {
-                    None
-                } else {
-                    let (last_idx) = x.index.pop().unwrap();
-                    let (last_data) = x.data.pop().unwrap();
-                    Some((last_idx, Data(last_data)))
-                }
-            }
-            InternalNode(x) => {
-                if x.index.len() <= ELEMENTS_PER_PAGE / 2 {
-                    None
-                } else {
-                    let (last_idx) = x.index.pop().unwrap();
-                    let (last_data) = x.data.pop().unwrap();
-                    Some((last_idx, ChildType::Node(last_data)))
-                }
-            }
+            // TODO: Combine these
+            LeafNode(x) => {pass_right(x)}
+            InternalNode(x) => {pass_right(x)}
+            _ => None
         }
     }
 
     fn pass_left(&mut self) -> Option<(IndexType, ChildType)> {
         match self {
-            Null => {
-                None
-            }
-            InternalNode(_) => {
-                None
-            }
-            LeafNode(x) => {
-                if x.index.len() <= ELEMENTS_PER_PAGE / 2 {
-                    None
-                } else {
-                    let (last_idx) = x.index.remove(0);
-                    let (last_data) = x.data.remove(0);
-                    Some((last_idx, Data(last_data)))
-                }
-            }
-            OverflowNode(_, _, _) => {
-                panic!("Overflow node should never be linked to")
-            }
+            // TODO: Combine these
+            LeafNode(x) => {pass_left(x)}
+            InternalNode(x) => {pass_left(x)}
+            _ => None
         }
     }
 
@@ -227,8 +192,8 @@ impl TreeNode {
 
     fn merge_from_left(&mut self, node: TreeNode) {
         match (node, self) {
-            (LeafNode(left), LeafNode(right)) => { merge_from_right(right, left) }
-            (InternalNode(left), InternalNode(right)) => { merge_from_right(right, left) }
+            (LeafNode(left), LeafNode(right)) => { merge_from_left(right, left) }
+            (InternalNode(left), InternalNode(right)) => { merge_from_left(right, left) }
             (_, _) => { panic!("Invalid merge attempted") }
         }
     }
@@ -267,6 +232,8 @@ trait NodeInterface {
     }
 
     fn wrap(node: Self) -> TreeNode;
+
+    fn remove_item_from_loc(&mut self, loc: usize) -> Option<(IndexType, ChildType)>;
 }
 
 
@@ -358,6 +325,15 @@ impl NodeInterface for LeafItem {
 
     fn wrap(node: Self) -> TreeNode {
         LeafNode(node)
+    }
+
+    fn remove_item_from_loc(&mut self, loc: usize) -> Option<(IndexType, ChildType)> {
+        if loc < self.index.len() {
+            return None
+        }
+        let idx = self.index.remove(loc);
+        let data = self.data.remove(loc);
+        Some((idx, Data(data)))
     }
 }
 
@@ -456,6 +432,15 @@ impl NodeInterface for InternalItem {
 
     fn wrap(node: Self) -> TreeNode {
         InternalNode(node)
+    }
+
+    fn remove_item_from_loc(&mut self, loc: usize) -> Option<(IndexType, ChildType)> {
+            if loc < self.index.len() {
+                return None
+            }
+            let idx = self.index.remove(loc);
+            let data = self.data.remove(loc);
+            Some((idx, ChildType::Node(data)))  
     }
 }
 
@@ -618,6 +603,21 @@ impl fmt::Display for TreeNode {
 }
 
 
+fn pass_right<T: NodeInterface>(x: &mut T) -> Option<(IndexType, ChildType)> {
+    if x.get_index_len() <= ELEMENTS_PER_PAGE / 2 {
+        None
+    } else {
+        x.pop_last_data_and_index()
+    }
+}
+
+fn pass_left<T: NodeInterface>(x: &mut T) -> Option<(IndexType, ChildType)> {
+    if x.get_index_len() <= ELEMENTS_PER_PAGE / 2 {
+        None
+    } else {
+        x.remove_item_from_loc(0)
+    }
+}
 
 fn merge_on_underflow<T: NodeInterface>(mut node: T) -> TreeNode {
     if node.is_empty() {
