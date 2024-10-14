@@ -64,14 +64,7 @@ impl TreeNode {
                     None
                 })
             }
-            OverflowNode(left, pivot, right) => {
-                if index < pivot {
-                    left.lock().ok().and_then(|node| node.get_item_inner(index))
-                } else {
-                    right.lock().ok().and_then(|node| node.get_item_inner(index))
-                }
-            }
-            Null => None,
+            _=> None
         }
     }
     fn print_node(&self, f: &mut fmt::Formatter<'_>, depth: usize) -> fmt::Result {
@@ -233,60 +226,10 @@ impl TreeNode {
     }
 
     fn merge_from_left(&mut self, node: TreeNode) {
-        println!("Merge from left");
-        match node {
-            InternalNode(x) => {
-                match self {
-                    InternalNode(current_node) => {
-                        // note that these take ownership (or should at least)
-                        let mut index = x.index;
-                        let mut data = x.data;
-
-                        match index.last() {
-                            None => {}
-                            Some(x) => {
-                                if *x == usize::max_value() {
-                                    index.pop();
-                                }
-                            }
-                        }
-
-                        current_node.index.reverse();
-                        current_node.data.reverse();
-                        while let (Some(idx), Some(datum)) = (current_node.index.pop(), current_node.data.pop()) {
-                            index.push(idx);
-                            data.push(datum);
-                        }
-                        current_node.index = index;
-                        current_node.data = data;
-                        current_node.left_pointer = x.left_pointer.clone();
-                        x.left_pointer.lock().unwrap().set_right_pointer(x.right_pointer.clone());
-                    }
-                    _ => { panic!("Can't merge internal nodes with non internal nodes") }
-                }
-            }
-            LeafNode(mut x) => {
-                match self {
-                    LeafNode(current_node) => {
-                        // note that these take ownership (or should at least)
-                        let mut index = x.index;
-                        let mut data = x.data;
-                        current_node.index.reverse();
-                        current_node.data.reverse();
-                        while let (Some(idx), Some(datum)) = (current_node.index.pop(), current_node.data.pop()) {
-                            index.push(idx);
-                            data.push(datum);
-                        }
-                        current_node.index = index;
-                        current_node.data = data;
-                        current_node.left_pointer = x.left_pointer.clone();
-                        x.left_pointer.lock().unwrap().set_right_pointer(x.right_pointer.clone());
-                    }
-                    _ => { panic!("Can't merge leaf nodes with non leaf nodes") }
-                }
-            }
-            Null => {}
-            _ => { panic!("Can't merge an overflow using merge_from_right") }
+        match (node, self) {
+            (LeafNode(left), LeafNode(right)) => { merge_from_right(right, left) }
+            (InternalNode(left), InternalNode(right)) => { merge_from_right(right, left) }
+            (_, _) => { panic!("Invalid merge attempted") }
         }
     }
 }
@@ -314,6 +257,10 @@ trait NodeInterface {
     fn set_left_pointer(&mut self, ptr: Arc<Mutex<TreeNode>>);
 
     fn set_right_pointer(&mut self, ptr: Arc<Mutex<TreeNode>>);
+
+    fn pop_usize_max(&mut self);
+
+    fn move_data_to(&mut self, other: Box<Self>);
 }
 
 
@@ -392,6 +339,16 @@ impl NodeInterface for LeafItem {
     fn set_right_pointer(&mut self, ptr: Arc<Mutex<TreeNode>>) {
         self.right_pointer = ptr.clone();
     }
+
+    fn pop_usize_max(&mut self) {
+        ()
+    }
+
+    fn move_data_to(&mut self, other: Box<Self>) {
+        let old: LeafItem = *other;
+        self.data = old.data;
+        self.index = old.index;
+    }
 }
 
 impl NodeInterface for InternalItem {
@@ -468,6 +425,23 @@ impl NodeInterface for InternalItem {
 
     fn set_right_pointer(&mut self, ptr: Arc<Mutex<TreeNode>>) {
         self.right_pointer = ptr.clone();
+    }
+
+    fn pop_usize_max(&mut self)  {
+        match self.index.last() {
+            None => {}
+            Some(x) => {
+                if *x == usize::max_value() {
+                    self.index.pop();
+                }
+            }
+        }
+    }
+
+    fn move_data_to(&mut self, other: Box<Self>) {
+        let old: InternalItem = *other;
+        self.data = old.data;
+        self.index = old.index;
     }
 }
 
@@ -580,12 +554,27 @@ fn split_item<T: NodeInterface>(mut item: T) -> TreeNode {
 }
 
 
-fn merge_from_right<T: NodeInterface>(left: &mut T, mut right: T) {
-    while let Some((idx, datum)) = right.pop_last_data_and_index() {
-        left.push(idx, datum);
+fn copy_data<T: NodeInterface>(source: &mut T, target: &mut T) {
+    while let Some((idx, datum)) = source.pop_last_data_and_index() {
+        target.push(idx, datum);
     }
+}
+
+fn merge_from_right<T: NodeInterface>(left: &mut T, mut right: T) {
+    copy_data(&mut right, left);
     left.set_right_pointer(right.get_right_pointer().clone());
     right.get_right_pointer().lock().unwrap().set_left_pointer(right.get_left_pointer().clone());
+}
+
+fn merge_from_left<T: NodeInterface>(right: &mut T, mut left: T) {
+    left.pop_usize_max();
+    right.reverse_data();
+
+    copy_data(right, &mut left);
+
+    right.set_left_pointer(left.get_left_pointer().clone());
+    left.get_left_pointer().lock().unwrap().set_right_pointer(left.get_right_pointer().clone());
+    right.move_data_to(Box::new(left));
 }
 
 
