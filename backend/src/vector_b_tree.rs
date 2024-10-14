@@ -261,6 +261,12 @@ trait NodeInterface {
     fn pop_usize_max(&mut self);
 
     fn move_data_to(&mut self, other: Box<Self>);
+
+    fn is_empty(&self) -> bool {
+        self.get_index_len() > 0
+    }
+
+    fn wrap(node: Self) -> TreeNode;
 }
 
 
@@ -348,6 +354,10 @@ impl NodeInterface for LeafItem {
         let old: LeafItem = *other;
         self.data = old.data;
         self.index = old.index;
+    }
+
+    fn wrap(node: Self) -> TreeNode {
+        LeafNode(node)
     }
 }
 
@@ -442,6 +452,10 @@ impl NodeInterface for InternalItem {
         let old: InternalItem = *other;
         self.data = old.data;
         self.index = old.index;
+    }
+
+    fn wrap(node: Self) -> TreeNode {
+        InternalNode(node)
     }
 }
 
@@ -604,53 +618,47 @@ impl fmt::Display for TreeNode {
 }
 
 
+
+fn merge_on_underflow<T: NodeInterface>(mut node: T) -> TreeNode {
+    if node.is_empty() {
+        return Null;
+    } else if node.get_index_len() < ELEMENTS_PER_PAGE / 2 {
+        // merge if underfull
+        if let Some((new_idx, new_datum)) = node.get_left_pointer().clone().lock().unwrap().pass_right() {
+            // Try to take from left
+            node.insert(new_idx, new_datum, 0);
+            return T::wrap(node)
+        }
+
+        if let Some((new_idx, new_datum)) = node.get_right_pointer().clone().lock().unwrap().pass_left() {
+            // Try to take from right
+            node.push(new_idx, new_datum);
+            return T::wrap(node);
+        }
+
+        if !node.get_left_pointer().clone().lock().unwrap().is_null() {
+            // Merge to Left
+            node.get_left_pointer().clone().lock().unwrap().merge_from_right(T::wrap(node));
+            Null
+        } else if !node.get_right_pointer().lock().unwrap().is_null() {
+            node.get_right_pointer().clone().lock().unwrap().merge_from_left(T::wrap(node));
+            Null
+        } else {
+            T::wrap(node)
+        }
+    } else {
+        T::wrap(node)
+    }
+}
+
+
 fn delete_from_leaf_item(mut node: LeafItem, index: IndexType) -> TreeNode {
     let loc = binary_search_leafs(&node.index, &index, compare);
     if loc < node.index.len() && node.index[loc] == index {
         node.index.remove(loc);
         node.data.remove(loc);
+        merge_on_underflow(node)
 
-        if node.index.is_empty() {
-            return Null;
-        } else if node.index.len() < ELEMENTS_PER_PAGE / 2 {
-            // merge if underfull
-            if let Some((new_idx, new_datum)) = node.left_pointer.clone().lock().unwrap().pass_right() {
-                // Try to take from left
-                node.index.insert(0, new_idx);
-                node.data.insert(0, match new_datum {
-                    Data(x) => { x }
-                    ChildType::Node(_) => {
-                        panic!("Internal links to a leaf node")
-                    }
-                });
-                return LeafNode(node);
-            }
-
-            if let Some((new_idx, new_datum)) = node.right_pointer.clone().lock().unwrap().pass_left() {
-                // Try to take from right
-                node.index.push(new_idx);
-                node.data.push(match new_datum {
-                    Data(x) => { x }
-                    ChildType::Node(_) => {
-                        panic!("Internal links to a leaf node")
-                    }
-                });
-                return LeafNode(node);
-            }
-
-            if !node.left_pointer.clone().lock().unwrap().is_null() {
-                // Merge to Left
-                node.left_pointer.clone().lock().unwrap().merge_from_right(LeafNode(node));
-                Null
-            } else if !node.right_pointer.lock().unwrap().is_null() {
-                node.right_pointer.clone().lock().unwrap().merge_from_left(LeafNode(node));
-                Null
-            } else {
-                LeafNode(node)
-            }
-        } else {
-            LeafNode(node)
-        }
     } else {
         // Does not contain record
         LeafNode(node)
@@ -687,47 +695,7 @@ fn delete_from_internal_node(mut node: InternalItem, index: IndexType) -> TreeNo
         }
     }
 
-    if node.data.len() < ELEMENTS_PER_PAGE / 2 {
-        // merge if underfull
-        if let Some((new_idx, new_datum)) = node.left_pointer.clone().lock().unwrap().pass_right() {
-            // Try to take from left
-            node.index.insert(0, new_idx);
-            node.data.insert(0, match new_datum {
-                Data(_) => { panic!("Internal links to a leaf node") }
-                ChildType::Node(x) => { x }
-            });
-            return InternalNode(node);
-        }
-
-        if let Some((new_idx, new_datum)) = node.right_pointer.clone().lock().unwrap().pass_left() {
-            // Try to take from right
-            node.index.push(new_idx);
-            node.data.push(match new_datum {
-                Data(_) => { panic!("Internal links to a leaf node") }
-                ChildType::Node(x) => { x }
-            });
-            return InternalNode(node);
-        }
-
-        if !node.left_pointer.clone().lock().unwrap().is_null() {
-            // Merge to Left
-            node.left_pointer.clone().lock().unwrap().merge_from_right(InternalNode(node));
-            Null
-        } else if !node.right_pointer.lock().unwrap().is_null() {
-            node.right_pointer.clone().lock().unwrap().merge_from_left(InternalNode(node));
-            Null
-        } else {
-            if (node.data.len() == 1) {
-                let mut child = Null;
-                swap(&mut child, node.data[0].lock().unwrap().deref_mut());
-                child
-            } else {
-                InternalNode(node)
-            }
-        }
-    } else {
-        InternalNode(node)
-    }
+    merge_on_underflow(node)
 }
 
 
