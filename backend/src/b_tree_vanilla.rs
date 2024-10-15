@@ -1,9 +1,9 @@
-use crate::vector_b_tree::ChildType::Data;
-use crate::vector_b_tree::TreeNode::*;
+use crate::b_tree_vanilla::ChildType::Data;
+use crate::b_tree_vanilla::TreeNode::*;
 use std::cmp::max;
 use std::fmt;
 use std::mem::swap;
-use std::ops::{Deref, DerefMut};
+use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
 
 const ELEMENTS_PER_PAGE: usize = 4;
@@ -788,7 +788,7 @@ impl fmt::Display for BTree {
 // TODO: I need to write better/more extensive tests
 #[cfg(test)]
 mod tests {
-    use crate::vector_b_tree::{BTree, DataType};
+    use crate::b_tree_vanilla::{BTree, DataType};
     // Each test function is annotated with #[test]
     #[test]
     fn init_test() {
