@@ -84,20 +84,28 @@ fn search(index: &Vec<Tensor>, query: &Tensor) -> usize {
 
 
 fn define_split_vector(vectors: &Vec<Tensor>) -> Tensor {
-    let num_dim = vectors.first().unwrap().size()[0];
-    let zero = Tensor::zeros(&[num_dim], (FLOAT_CUDA));
-    let mut indexes = vectors.iter().enumerate().map(|(i, x)| {i}).collect::<Vec<usize>>();
-    indexes.sort_by(|l, r| {(l - zero).partial_comp(r- zero)}); // Sort by distance from zero
-    let new_tensor = indexes.iter().enumerate().map(|(i, x)| {
+    let num_dim = vectors[0].size()[0];
+    let zero = Tensor::zeros(&[num_dim], (Kind::Float, vectors[0].device()));
+
+    let mut indexes: Vec<usize> = (0..vectors.len()).collect();
+    indexes.sort_by(|&a, &b| {
+        let diff_a = &vectors[a] - &zero;
+        let diff_b = &vectors[b] - &zero;
+        diff_a.norm().int64_value(&[]).cmp(&diff_b.norm().int64_value(&[]))
+            
+    });
+
+    let new_tensor = indexes.iter().enumerate().map(|(i, &x)| {
         if i < indexes.len() / 2 {
-            - vectors[*x].copy()
+            -1 * vectors[x].copy()
         } else {
-            vectors[*x].copy()
+            vectors[x].copy()
         }
-    }).reduce(|prev,x|{prev+x}).unwrap();
-    
+    }).sum();
+
     new_tensor
 }
+
 
 
 
