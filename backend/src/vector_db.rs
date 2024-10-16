@@ -1,9 +1,7 @@
-use std::ops::Index;
-use libc::mincore;
-use numpy::dot;
-use tch::{Device, Kind, Tensor};
-use tch::Kind::Float;
 use crate::llama_embedding::LlamafileEmbedding;
+use tch::Kind::Float;
+use tch::kind::{FLOAT_CPU, FLOAT_CUDA};
+use tch::Tensor;
 
 const ELEMENTS_PER_PAGE: usize = 4;
 type IndexType = Tensor;
@@ -85,6 +83,23 @@ fn search(index: &Vec<Tensor>, query: &Tensor) -> usize {
 }
 
 
+fn define_split_vector(vectors: &Vec<Tensor>) -> Tensor {
+    let num_dim = vectors.first().unwrap().size()[0];
+    let zero = Tensor::zeros(&[num_dim], (FLOAT_CUDA));
+    let mut indexes = vectors.iter().enumerate().map(|(i, x)| {i}).collect::<Vec<usize>>();
+    indexes.sort_by(|l, r| {(l - zero).partial_comp(r- zero)}); // Sort by distance from zero
+    let new_tensor = indexes.iter().enumerate().map(|(i, x)| {
+        if i < indexes.len() / 2 {
+            - vectors[*x].copy()
+        } else {
+            vectors[*x].copy()
+        }
+    }).reduce(|prev,x|{prev+x}).unwrap();
+    
+    new_tensor
+}
+
+
 
 fn insert(node: TreeNode, data: DataType) -> TreeNode {
     match node {
@@ -92,10 +107,10 @@ fn insert(node: TreeNode, data: DataType) -> TreeNode {
         TreeNode::LeafNode(node) => {
             if node.children.len() > 1 {
                 
-            } else { 
-                
+            } else {
+
             }
-            
+
             let loc = search(&node.index, &data.index);
         }
         _ => todo!();
