@@ -1,15 +1,17 @@
-
-
-use std::ffi::{CString, c_void};
 use libc::{c_char, c_float};
-use tch::{Tensor, Device};
+use std::ffi::{c_void, CString};
+use tch::{Device, Tensor};
 
 #[link(name = "llamafile_embedding_lib")]
 extern "C" {
     fn create_embedding(model_path: *const c_char) -> *mut c_void;
     fn destroy_embedding(embedding: *mut c_void);
     fn get_single_embedding(embedding: *mut c_void, text: *const c_char) -> *mut c_float;
-    fn get_multiple_embeddings(embedding: *mut c_void, texts: *const *const c_char, num_texts: usize) -> *mut c_float;
+    fn get_multiple_embeddings(
+        embedding: *mut c_void,
+        texts: *const *const c_char,
+        num_texts: usize,
+    ) -> *mut c_float;
 }
 
 pub struct LlamafileEmbedding {
@@ -31,15 +33,20 @@ impl LlamafileEmbedding {
     }
 
     fn get_embeddings(&self, texts: &[String]) -> Tensor {
-        let c_texts: Vec<*const c_char> = texts.iter()
+        let c_texts: Vec<*const c_char> = texts
+            .iter()
             .map(|s| CString::new(s.as_str()).unwrap().into_raw())
             .collect();
-        let embeddings_ptr = unsafe { get_multiple_embeddings(self.ptr, c_texts.as_ptr(), texts.len()) };
-        let embeddings = unsafe { Vec::from_raw_parts(embeddings_ptr, texts.len() * 768, texts.len() * 768) };
+        let embeddings_ptr =
+            unsafe { get_multiple_embeddings(self.ptr, c_texts.as_ptr(), texts.len()) };
+        let embeddings =
+            unsafe { Vec::from_raw_parts(embeddings_ptr, texts.len() * 768, texts.len() * 768) };
 
         // Clean up CStrings
         for &ptr in &c_texts {
-            unsafe { let _ = CString::from_raw(ptr as *mut c_char); }
+            unsafe {
+                let _ = CString::from_raw(ptr as *mut c_char);
+            }
         }
 
         Tensor::from_slice(&embeddings)
@@ -56,17 +63,17 @@ impl Drop for LlamafileEmbedding {
 
 // Example Use
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let model = LlamafileEmbedding::new("/path/to/your/llamafile/model");
+// fn main() -> Result<(), Box<dyn std::error::Error>> {
+//     let model = LlamafileEmbedding::new("/path/to/your/llamafile/model");
 
-    let embedding = model.get_embedding("Hello, world!");
-    println!("Single embedding shape: {:?}", embedding.size());
-    println!("Single embedding (first 5 values): {:?}", embedding.slice(0, 0, 5, 1).to_vec());
+//     let embedding = model.get_embedding("Hello, world!");
+//     println!("Single embedding shape: {:?}", embedding.size());
+//     println!("Single embedding (first 5 values): {:?}", embedding.slice(0, 0, 5, 1).to_vec());
 
-    let texts = vec!["Hello, world!".to_string(), "This is a test.".to_string()];
-    let embeddings = model.get_embeddings(&texts);
-    println!("Embeddings tensor shape: {:?}", embeddings.size());
-    println!("First embedding (first 5 values): {:?}", embeddings.slice(0, 0, 1, 1).slice(1, 0, 5, 1).to_vec());
+//     let texts = vec!["Hello, world!".to_string(), "This is a test.".to_string()];
+//     let embeddings = model.get_embeddings(&texts);
+//     println!("Embeddings tensor shape: {:?}", embeddings.size());
+//     println!("First embedding (first 5 values): {:?}", embeddings.slice(0, 0, 1, 1).slice(1, 0, 5, 1).to_vec());
 
-    Ok(())
-}
+//     Ok(())
+// }

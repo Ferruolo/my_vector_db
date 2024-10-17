@@ -1,23 +1,15 @@
-use crate::llama_embedding::LlamafileEmbedding;
 use crate::node_interface::NodeInterface;
 use tch::Tensor;
 
 pub(crate) struct Node<T> {
-    data: Vec<T>,
-    indexes: Vec<Tensor>,
+    pub data: Vec<T>,
+    pub indexes: Vec<Tensor>,
 }
 
 pub(crate) enum TreeNode<T> {
     LeafNode(Node<T>),
     Null,
     OverflowNode(Box<TreeNode<T>>, Tensor, Box<TreeNode<T>>),
-}
-
-pub(crate) struct VectorDB<T> {
-    data: Vec<TreeNode<T>>,
-    indexes: Vec<Tensor>,
-    embedding_item: LlamafileEmbedding,
-    zero: Tensor,
 }
 
 pub(crate) enum ChildType<T> {
@@ -45,7 +37,7 @@ impl<T> NodeInterface<T> for Node<T> {
         }
     }
 
-    fn push_back(&mut self, index: Tensor, datum: ChildType<T>, loc: usize) {
+    fn push_back(&mut self, index: Tensor, datum: ChildType<T>) {
         match datum {
             ChildType::Data(x) => self.data.push(x),
             _ => panic!("Tried to insert non data type into data"),
@@ -62,22 +54,16 @@ impl<T> NodeInterface<T> for Node<T> {
     }
 
     fn get_index_len(&self) -> usize {
-        unimplemented!()
+        return self.indexes.len();
     }
 
-    fn push(&mut self, index: Tensor, datum: ChildType<T>) {
-        unimplemented!()
-    }
-
-    fn push_last_element(&mut self) {
-        unimplemented!()
-    }
-
-    fn pop_usize_max(&mut self) {
-        unimplemented!()
-    }
-
-    fn move_data_to(&mut self, other: Box<Self>) {
-        unimplemented!()
+    fn create_new_with_data(index: Tensor, data: ChildType<T>) -> Self {
+        match data {
+            ChildType::Data(x) => Self {
+                data: vec![x],
+                indexes: vec![index],
+            },
+            _ => panic!("Tried to create node with non-data type"),
+        }
     }
 }
