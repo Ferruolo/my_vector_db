@@ -1,136 +1,54 @@
 use crate::llama_embedding::LlamafileEmbedding;
-use tch::Kind::Float;
-use tch::kind::{FLOAT_CPU, FLOAT_CUDA};
-use tch::Tensor;
 use crate::vector_db::TreeNode::{LeafNode, Null};
+use libc::PARMRK;
+use tch::kind::{FLOAT_CPU, FLOAT_CUDA};
+use tch::Kind::Float;
+use tch::Tensor;
+use crate::helpers::{binary_search, cosine_similarity_rust_float};
 
-const ELEMENTS_PER_PAGE: usize = 4;
-type IndexType = Tensor;
+const ELEMENTS_PER_PAGE: usize = 10;
 
-
-struct DataType {
-    index: IndexType,
-    data: String
-}
-
-impl DataType {
-    fn new(index: IndexType, data: String) -> DataType {
-        Self { index, data }
-    }
-}
-
-
-
-enum ChildType {
-    Data(DataType),
-    Child(Node)
-}
-
-struct Node {
-    index: Vec<IndexType>,
-    children: Vec<ChildType>,
+Node <T> {
+    indexes: Vector<Tensor>,
+    data: Vector<T>,
 }
 
 enum TreeNode {
-    Null,
-    InternalNode,
-    LeafNode(Node),
-    OverflowNode,
+    Null
+    LeafNode(Node)
 }
 
 
-struct VectorDB {
-    root_node: TreeNode,
-    embedding: LlamafileEmbedding
+struct VectorDB <T> {
+    zero: Tensor,
+    data: Vector<TreeNode>,
+    embedding_item: LlamafileEmbedding
 }
 
-impl VectorDB {
-    fn new(llamafile_embedding: LlamafileEmbedding) -> Self {
+
+
+impl VectorDB<T> {
+    pub fn new(model_path: &str, dims: usize) -> Self {
+        let zero = Tensor::zeros(dims, FLOAT_CUDA);
+        let embedding_model = LlamafileEmbedding::new(model_path);
         Self {
-            root_node: TreeNode::Null,
-            embedding: llamafile_embedding,
+           zero: zero,
+           data: vec![],
+           embedding_item: embedding_model
         }
     }
 
-    fn insert_data(&mut self, data: String) -> TreeNode {
-        let new_vec = self.embedding.get_embedding(data.as_str());
-        self.root_node = insert(self.root_node, DataType::new(new_vec, data));
+    pub fn insert(&mut self, new_data: T) {
+       if self.data.isEmpty() {
+
+       } else {
+          let compare = |l: &Tensor, r: &Tensor|{
+            cosine_similarity_rust_float(l, &self.zero) < cosine_similarity_rust_float(r, &self.zero)
+          };
+          let loc = binary_search(indexes, query, compare);
+
+
+       }
     }
 
-}
-
-fn compare(l: &Tensor, r: &Tensor) -> bool {
-    l.dot(r).sum(Float).int64_value(&[]) > 0
-}
-
-fn search(index: &Vec<Tensor>, query: &Tensor) -> usize {
-    let mut low: usize = 0;
-    let mut high: usize = index.len();
-
-    while low < high {
-        let mid = (low + high) / 2;
-        if compare(&index[mid], query) {
-            high = mid;
-        } else {
-            low = mid + 1;
-        }
-    }
-
-    if compare(&index[low], query) {
-        low
-    } else {
-        low + 1
-    }
-}
-
-
-fn define_split_vector(vectors: &Vec<Tensor>) -> Tensor {
-    let num_dim = vectors[0].size()[0];
-    let zero = Tensor::zeros(&[num_dim], (Kind::Float, vectors[0].device()));
-
-    let mut indexes: Vec<usize> = (0..vectors.len()).collect();
-    indexes.sort_by(|&a, &b| {
-        let diff_a = &vectors[a] - &zero;
-        let diff_b = &vectors[b] - &zero;
-        diff_a.norm().int64_value(&[]).cmp(&diff_b.norm().int64_value(&[]))
-            
-    });
-
-    let new_tensor = indexes.iter().enumerate().map(|(i, &x)| {
-        if i < indexes.len() / 2 {
-            -1 * vectors[x].copy()
-        } else {
-            vectors[x].copy()
-        }
-    }).sum();
-
-    new_tensor
-}
-
-
-
-
-fn insert_into_leaf_node(mut node: Node, data: DataType) -> TreeNode {
-    if node.children.len() > 1 {
-        if (node.children.len() + 1) % 2 == 0 {
-            
-        } else {
-            
-        }
-    } else {
-        node.children.push(ChildType::Data(data));
-    }
-
-    LeafNode(node)
-}
-
-
-fn insert(node: TreeNode, data: DataType) -> TreeNode {
-    match node {
-        Null => todo!(),
-        TreeNode::LeafNode(node) => {
-            insert_into_leaf_node(node, data)         
-        }
-        _ => todo!()
-    }
 }

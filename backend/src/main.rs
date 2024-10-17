@@ -1,7 +1,8 @@
 use crate::b_tree_vanilla::BTree;
 mod b_tree_vanilla;
-mod vector_db;
+mod helpers;
 mod llama_embedding;
+mod vector_db;
 
 fn main() {
     let mut tree = BTree::new();
