@@ -2,6 +2,7 @@ use crate::llama_embedding::LlamafileEmbedding;
 use tch::Kind::Float;
 use tch::kind::{FLOAT_CPU, FLOAT_CUDA};
 use tch::Tensor;
+use crate::vector_db::TreeNode::{LeafNode, Null};
 
 const ELEMENTS_PER_PAGE: usize = 4;
 type IndexType = Tensor;
@@ -109,21 +110,27 @@ fn define_split_vector(vectors: &Vec<Tensor>) -> Tensor {
 
 
 
-fn insert(node: TreeNode, data: DataType) -> TreeNode {
-    match node {
-        TreeNode::Null => {}
-        TreeNode::LeafNode(node) => {
-            if node.children.len() > 1 {
-                
-            } else {
-
-            }
-
-            let loc = search(&node.index, &data.index);
+fn insert_into_leaf_node(mut node: Node, data: DataType) -> TreeNode {
+    if node.children.len() > 1 {
+        if (node.children.len() + 1) % 2 == 0 {
+            
+        } else {
+            
         }
-        _ => todo!();
+    } else {
+        node.children.push(ChildType::Data(data));
     }
 
+    LeafNode(node)
+}
 
 
+fn insert(node: TreeNode, data: DataType) -> TreeNode {
+    match node {
+        Null => todo!(),
+        TreeNode::LeafNode(node) => {
+            insert_into_leaf_node(node, data)         
+        }
+        _ => todo!()
+    }
 }
