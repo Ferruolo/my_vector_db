@@ -1,6 +1,9 @@
 import requests
 import dotenv
+import os
+
 dotenv.load_dotenv()
+
 
 def search_nearby_places(api_key, lat, long, radius):
     url = "https://places.googleapis.com/v1/places:searchNearby"
@@ -8,12 +11,12 @@ def search_nearby_places(api_key, lat, long, radius):
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": api_key,
-        "X-Goog-FieldMask": "places.displayName"
+        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.types,places.websiteUri"
     }
 
     payload = {
         "includedTypes": ["restaurant"],
-        "maxResultCount": 10,
+        "maxResultCount": 20,
         "locationRestriction": {
             "circle": {
                 "center": {
@@ -34,10 +37,10 @@ def search_nearby_places(api_key, lat, long, radius):
 
 
 # Example usage
-api_key =
-latitude = 37.7937
-longitude = -122.3965
-radius = 500.0
+api_key = os.environ.get('GOOGLE_API_KEY')
+latitude = 40.7484
+longitude = -73.9857
+radius = 500
 
 result = search_nearby_places(api_key, latitude, longitude, radius)
-print(result)
+print(len(result))
