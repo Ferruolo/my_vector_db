@@ -5,6 +5,13 @@ import os
 dotenv.load_dotenv()
 
 
+
+
+
+start_lat = 40.8268
+end_lat = 40.6973
+
+
 def search_nearby_places(api_key, lat, long, radius):
     url = "https://places.googleapis.com/v1/places:searchNearby"
 
@@ -36,6 +43,9 @@ def search_nearby_places(api_key, lat, long, radius):
         return f"Error: {response.status_code}, {response.text}"
 
 
+
+
+
 # Example usage
 api_key = os.environ.get('GOOGLE_API_KEY')
 latitude = 40.7484
@@ -43,4 +53,5 @@ longitude = -73.9857
 radius = 500
 
 result = search_nearby_places(api_key, latitude, longitude, radius)
-print(len(result))
+# print(len(result))
+if __name__ == "__main__":
