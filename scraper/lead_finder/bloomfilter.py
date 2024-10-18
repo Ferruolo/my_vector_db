@@ -1,3 +1,5 @@
+import math
+
 FNV_PRIME_32 = 16777619
 FNV_OFFSET_32 = 2166136261
 
@@ -26,3 +28,28 @@ def chained_fnv1a(data: str, k: int) -> int:
     for _ in range(k):
         result = fnv1a_32(result)
     return result
+
+
+class BloomFilter:
+    def __init__(self, capacity: int, expected_entries: int):
+        self.capacity = capacity + 7
+        self.expected_entries = expected_entries
+        self.bit_arr = bytearray(self.capacity // 8)
+        print(len(self.bit_arr))
+        self.k = math.floor((self.capacity / self.expected_entries) * math.log(2))
+        print(self.k)
+
+        prob_collision =  (1 - math.exp(-self.k * self.expected_entries / self.capacity)) ** self.k
+        print(f"Bloom Filter created with collision probability {prob_collision}")
+
+    def add_item(self, key: str):
+        index = chained_fnv1a(key, self.k) % self.capacity
+        self.bit_arr[index // 8] |= 1 << (index % 8)
+
+    def clear_item(self, key: str):
+        index = chained_fnv1a(key, self.k) % self.capacity
+        self.bit_arr[index // 8] &= ~(1 << (index % 8))
+
+    def get_item(self, key: str):
+        index = chained_fnv1a(key, self.k) % self.capacity
+        return bool(self.bit_arr[index // 8] & (1 << (index % 8)))

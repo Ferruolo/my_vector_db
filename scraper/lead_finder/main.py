@@ -1,15 +1,14 @@
 import requests
 import dotenv
 import os
-
+import uuid
 dotenv.load_dotenv()
-
-
-
 
 
 start_lat = 40.8268
 end_lat = 40.6973
+start_long = -74.0588
+end_long = -73.9181
 
 
 def search_nearby_places(api_key, lat, long, radius):
@@ -44,12 +43,16 @@ def search_nearby_places(api_key, lat, long, radius):
 
 
 
+def search_grid_area(lat_start, lat_end, long_start, long_end, radius, num_squares):
+
+
+
+
 
 
 # Example usage
 api_key = os.environ.get('GOOGLE_API_KEY')
-latitude = 40.7484
-longitude = -73.9857
+
 radius = 500
 
 result = search_nearby_places(api_key, latitude, longitude, radius)
