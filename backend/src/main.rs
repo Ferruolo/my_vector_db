@@ -1,4 +1,3 @@
-mod b_tree_vanilla;
 mod helpers;
 mod llama_embedding;
 mod node_interface;
