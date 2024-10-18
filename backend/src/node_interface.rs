@@ -27,4 +27,6 @@ pub(crate) trait NodeInterface<T> {
     fn is_empty(&self) -> bool {
         self.get_index_len() == 0
     }
+    
+    fn get_ref(&self) -> &Self;
 }

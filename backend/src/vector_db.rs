@@ -36,58 +36,64 @@ impl<T> VectorDB<T> {
             }));
         } else {
             let loc = binary_search(&self.indexes, &query, &compare_func);
-            insert_into_tree_node(&mut self.data[loc], new_data, query, compare_func);
+            insert_into_tree_node(self.data[loc], new_data, query, compare_func);
         };
     }
 
-    pub fn get_top_k_indexes(self, query_string: String, k: usize) {
+    pub fn get_top_k_indexes(self, query_string: String, k: usize) -> Vec<usize> {
         let query = self.embedding_item.get_embedding(query_string.as_str());
         let mut index_vec = vec![];
-        let mut dist_vec = vec![];
-        let idx = 0;
+        let mut dist_vec: Vec<f32> = vec![];
+        let mut idx = 0;
         for node in self.data {
-            let node_item: Node<T> = node.into();
-            for i in 0..node_item.get_index_len() {
-                let dist = cosine_similarity_rust_float(&query, &node_item.indexes[i]);
-                let loc = binary_search_floats(&dist_vec, &dist);
-                index_vec.insert(loc, i);
-                dist_vec.insert(loc, dist);
-                if dist_vec.len() > k {
-                    dist_vec.pop();
-                    index_vec.pop();
+            match node {
+                LeafNode(node) => {
+                    let node_item: Node<T> = node.into();
+                    for i in 0..node_item.get_index_len() {
+                        let dist = cosine_similarity_rust_float(&query, &node_item.indexes[i]);
+                        let loc = binary_search_floats(&dist_vec, &dist);
+                        index_vec.insert(loc, idx);
+                        dist_vec.insert(loc, dist);
+                        if dist_vec.len() > k {
+                            dist_vec.pop();
+                            index_vec.pop();
+                        }
+                        idx += 1;
+                    }
                 }
+                _ => {}
             }
         }
         index_vec
     }
 }
 
-fn split_node<T>(node: Node<T>) -> TreeNode<T> {
+fn split_node<T>(mut node: Node<T>) -> TreeNode<T> {
     if node.get_index_len() < ELEMENTS_PER_PAGE {
         return LeafNode(node);
     }
     let midpt = node.get_midpoint_idx();
     node.reverse_data();
-    let (left, right) = (Node::new(), Node::new());
-    let selcted: &Node<T> = &right;
-    while let Some(idx, datum) = node.pop_last_data_and_index() {
+    let (mut left, mut right) = (Node::new(), Node::new());
+    let mut selected: &mut Node<T> = &mut right;
+    while let Some((idx, datum)) = node.pop_last_data_and_index() {
         if node.get_index_len() < midpt {
-            selcted = &right;
+            selected = &mut left;
         }
-        selcted.push_back(idx, datum);
+        selected.push_back(idx, datum);
     }
     let new_index = right.indexes.first().unwrap().copy();
-    TreeNode::OverflowNode(Box::new(left), new_index, Box::new(right))
+    TreeNode::OverflowNode(Box::new(LeafNode(left)), new_index, Box::new(LeafNode(right)))
 }
 
 fn insert_into_tree_node<T>(
-    node: &mut TreeNode<T>,
+    node: TreeNode<T>,
     new_data: T,
     query: Tensor,
     compare: impl Fn(&Tensor, &Tensor) -> bool,
 ) -> TreeNode<T> {
     match node {
-        LeafNode(node) => {
+        LeafNode(mut node) => {
             let loc = binary_search(&node.indexes, &query, &compare);
             node.data.insert(loc, new_data);
             node.indexes.insert(loc, query);

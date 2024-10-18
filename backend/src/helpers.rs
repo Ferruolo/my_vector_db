@@ -27,7 +27,7 @@ pub(crate) fn cosine_similarity_rust_float<'a, 'b>(l: &'a Tensor, r: &'b Tensor)
     similarity.double_value(&[]) as f32
 }
 
-pub(crate) fn binary_search_floats(array: &Vec<f64>, query: &f64) -> usize {
+pub(crate) fn binary_search_floats(array: &Vec<f32>, query: &f32) -> usize {
     let mut low = 0;
     let mut high = array.len();
     let mut mid: usize;
