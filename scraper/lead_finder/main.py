@@ -1,9 +1,11 @@
+from redis import Redis
 import requests
 import dotenv
 import os
-import uuid
-dotenv.load_dotenv()
+from shared.redis_intrerface import create_redis_client, create_redis_queue
+import json
 
+dotenv.load_dotenv()
 
 start_lat = 40.8268
 end_lat = 40.6973
@@ -37,24 +39,40 @@ def search_nearby_places(api_key, lat, long, radius):
     response = requests.post(url, json=payload, headers=headers)
 
     if response.status_code == 200:
-        return response.json()
+        try:
+            return response.json()['places']
+        except Exception as e:
+            print(response.json())
+            print("Found None")
+            return None
     else:
-        return f"Error: {response.status_code}, {response.text}"
+        print(f"Error: {response.status_code}, {response.text}")
+        return None
 
 
+def search_grid_area(api_key: str, client: Redis, lat_start, lat_end, long_start, long_end, radius, num_squares):
+    push, pop, length, is_empty = create_redis_queue(client, "search_queue")
+    diff_x = (long_end - long_start) / num_squares
+    diff_y = (lat_end - lat_start) / num_squares
+    lat = lat_start
+    long = long_start
+    #TODO: Not perfect, but works for now
+    idx = 0
+    while lat > lat_end:
+        while long < long_end:
+            print(f"{idx}: Fetching data for ({lat:.04f}, {long:.04f})")
+            data = search_nearby_places(api_key, lat, long, radius)
+            if data is not None:
+                [push(json.dumps(x)) for x in data]
+            idx += 1
+            long += diff_x
+            # time.sleep(1)
+        lat -= diff_y
+        long = long_start
 
-def search_grid_area(lat_start, lat_end, long_start, long_end, radius, num_squares):
 
-
-
-
-
-
-# Example usage
-api_key = os.environ.get('GOOGLE_API_KEY')
-
-radius = 500
-
-result = search_nearby_places(api_key, latitude, longitude, radius)
-# print(len(result))
-if __name__ == "__main__":
+if __name__ == '__main__':
+    api_key = os.environ.get('GOOGLE_API_KEY')
+    client = create_redis_client()
+    print("HELLO WORLD")
+    search_grid_area(api_key, client, start_lat, end_lat, start_long, end_long, 500, 1000)

@@ -1,4 +1,3 @@
-from charset_normalizer.cli import cli_detect
 from redis import Redis
 
 
@@ -7,7 +6,7 @@ def create_redis_client():
     return client
 
 
-def create_redis_queue(client: Redis, queue_name: str, db_num: 1):
+def create_redis_queue(client: Redis, queue_name: str, db_num = 1):
     def push(item):
         client.select(db_num)
         client.lpush(queue_name, item)
@@ -22,7 +21,7 @@ def create_redis_queue(client: Redis, queue_name: str, db_num: 1):
         return client.llen(queue_name)
 
     def is_empty():
-        var = length() is 0
+        var = length() == 0
         return var
 
     return push, pop, length, is_empty
