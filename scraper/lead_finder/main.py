@@ -2,7 +2,7 @@ from redis import Redis
 import requests
 import dotenv
 import os
-from shared.redis_intrerface import create_redis_client, create_redis_queue
+from shared.redis_interface import create_redis_client, create_redis_queue
 import json
 
 dotenv.load_dotenv()

@@ -1,5 +1,5 @@
 import requests
-from shared.redis_intrerface import create_redis_queue, create_redis_client, create_document_db_interface
+from shared.redis_interface import create_redis_queue, create_redis_client, create_document_db_interface
 from bs4 import BeautifulSoup
 import json
 from shared.models import LocationData
@@ -38,8 +38,10 @@ def is_valid_url(url):
     pattern = r'^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$'
     return bool(re.match(pattern, url))
 
+
 def ends_with_pdf(url):
     return url.lower().endswith('.pdf')
+
 
 # assumes base-url is already cleaned for efficiency's sake
 def get_all_links(page: BeautifulSoup, base_url: str):

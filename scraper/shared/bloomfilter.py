@@ -35,10 +35,7 @@ class BloomFilter:
         self.capacity = capacity + 7
         self.expected_entries = expected_entries
         self.bit_arr = bytearray(self.capacity // 8)
-        print(len(self.bit_arr))
         self.k = math.floor((self.capacity / self.expected_entries) * math.log(2))
-        print(self.k)
-
         prob_collision =  (1 - math.exp(-self.k * self.expected_entries / self.capacity)) ** self.k
         print(f"Bloom Filter created with collision probability {prob_collision}")
 
