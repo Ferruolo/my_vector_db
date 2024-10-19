@@ -3,6 +3,7 @@ mod llama_embedding;
 mod node_interface;
 mod types;
 mod vector_db;
+mod DB_interface;
 
 use std::sync::Arc;
 use serde::{Deserialize, Serialize};
