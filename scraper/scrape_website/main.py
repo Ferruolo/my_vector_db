@@ -38,6 +38,8 @@ def is_valid_url(url):
     pattern = r'^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$'
     return bool(re.match(pattern, url))
 
+def ends_with_pdf(url):
+    return url.lower().endswith('.pdf')
 
 # assumes base-url is already cleaned for efficiency's sake
 def get_all_links(page: BeautifulSoup, base_url: str):
@@ -68,11 +70,16 @@ def search_data(data: LocationData):
     full_text = ""
     while not search_container.is_empty():
         current_url = search_container.pop()
-        soup = BeautifulSoup(requests.get().content, "html.parser")
-        text = get_text(soup)
-        links = get_all_links(soup, base_url)
-        for link in links:
-            search_container.push(link)
+        text = ""
+        link_content = requests.get(current_url).content
+        if ends_with_pdf(current_url):
+            text = extract_text_from_pdf(link_content)
+        else:
+            soup = BeautifulSoup(link_content, "html.parser")
+            text = get_text(soup)
+            links = get_all_links(soup, base_url)
+            for link in links:
+                search_container.push(link)
         full_text += f"Current URL: {current_url}\n\n {text} \n\n"
     return full_text
 
