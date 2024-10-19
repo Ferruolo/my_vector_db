@@ -28,5 +28,5 @@ pub(crate) trait NodeInterface<T> {
         self.get_index_len() == 0
     }
     
-    fn get_ref(&self) -> &Self;
+    // fn get_ref(&self) -> &Self;
 }

@@ -19,7 +19,7 @@ pub(crate) fn binary_search(
     low
 }
 
-pub(crate) fn cosine_similarity_rust_float<'a, 'b>(l: &'a Tensor, r: &'b Tensor) -> f32 {
+pub(crate) fn cosine_similarity_rust_float(l: &Tensor, r: &Tensor) -> f32 {
     let dot_product = l.dot(r);
     let l_norm = l.norm();
     let r_norm = r.norm();
@@ -42,7 +42,7 @@ pub(crate) fn binary_search_floats(array: &Vec<f32>, query: &f32) -> usize {
     low
 }
 
-pub(crate) fn compare<'a>(zero: &'a Tensor) -> impl Fn(&Tensor, &Tensor) -> bool + 'a {
+pub(crate) fn compare(zero: &Tensor) -> impl Fn(&Tensor, &Tensor) -> bool {
     move |l: &Tensor, r: &Tensor| {
         cosine_similarity_rust_float(l, zero) < cosine_similarity_rust_float(r, zero)
     }

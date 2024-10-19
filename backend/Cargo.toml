@@ -11,6 +11,8 @@ pyo3 = { version = "0.18", features = ["extension-module"] }
 numpy = "0.18"
 libc = "0.2.159"
 tch = "0.17.0"
+serde = { version = "1.0.210", features = ["derive"] }
+tokio = "1.40.0"
 #anyhow = "1.0"
 #tiktoken-rs = "0.5.0"
 #tokio = { version = "1.0", features = ["full"] }
