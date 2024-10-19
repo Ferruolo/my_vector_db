@@ -1,5 +1,5 @@
 import requests
-from shared.redis_intrerface import create_document_db_interface, create_redis_queue, create_redis_client
+from shared.redis_intrerface import create_redis_queue, create_redis_client, create_document_db_interface
 from bs4 import BeautifulSoup
 import json
 from shared.models import LocationData
@@ -7,9 +7,14 @@ from urllib.parse import urlparse
 import PyPDF2
 import re
 import io
+from queue import Queue
+from shared.unique_search_container import UniqueSearchContainer
+from redis import Redis
+
 
 def remove_trailing_slash(url):
     return re.sub(r'/$', '', url)
+
 
 def extract_text_from_pdf(pdf_data):
     pdf_file = io.BytesIO(pdf_data)
@@ -23,33 +28,73 @@ def extract_text_from_pdf(pdf_data):
 def extract_base_url(url):
     parsed_url = urlparse(url)
     base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
+    base_url = remove_trailing_slash(base_url)
     return base_url
 
 
-client = create_redis_client()
+def is_valid_url(url):
+    if url is None:
+        return False
+    pattern = r'^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$'
+    return bool(re.match(pattern, url))
 
-push, pop, length, is_empty = create_redis_queue(client, "search_queue")
 
-item = pop()
+# assumes base-url is already cleaned for efficiency's sake
+def get_all_links(page: BeautifulSoup, base_url: str):
+    links = [a.get('href') for a in page.find_all('a')]
+    links = list(filter(lambda x: is_valid_url(x), links))
+    links = list(filter(lambda x: extract_base_url(x) != base_url, links))
+    return links
 
-data = LocationData(**json.loads(item))
 
-soup = BeautifulSoup(requests.get(data.websiteUri).content, "html.parser")
+def get_text(page: BeautifulSoup):
+    text = list()
+    search = Queue()
+    search.put(page)
 
-clean_link = extract_base_url(data.websiteUri)
+    while not search.empty():
+        soup: BeautifulSoup = search.get()
+        if soup.string:
+            text.append(soup.string.strip())
+        for child in soup.children:
+            if isinstance(child, BeautifulSoup):
+                search.put(child)
+    return '\n'.join(text)
 
-links = soup.find_all("a")
-links = [link.get('href') for link in links]
 
-local_links = [link for link in links if link and extract_base_url(link) == clean_link]
-local_links = list(filter(lambda x: x != clean_link, local_links))
+def search_data(data: LocationData):
+    base_url = extract_base_url(data.websiteUri)
+    search_container = UniqueSearchContainer(200, 50, useDFS=False)
+    full_text = ""
+    while not search_container.is_empty():
+        current_url = search_container.pop()
+        soup = BeautifulSoup(requests.get().content, "html.parser")
+        text = get_text(soup)
+        links = get_all_links(soup, base_url)
+        for link in links:
+            search_container.push(link)
+        full_text += f"Current URL: {current_url}\n\n {text} \n\n"
+    return full_text
 
-menu = local_links[1]
-menu_soup = BeautifulSoup(requests.get(menu).content, "html.parser")
-menu_soup_links = [x.get('href') for x in menu_soup.find_all('a')]
-menu_soup_links = [link for link in menu_soup_links if link and extract_base_url(link) == clean_link]
 
-example_url = "https://www.segoviameson.com/pdfs/menu_lunch.pdf"
+def main_program(redis_client: Redis):
+    push, pop, length, is_empty = create_redis_queue(redis_client, "search_queue")
+    put_item, delete_item, fetch_item = create_document_db_interface(redis_client)
+    while not is_empty():
+        try:
+            item = pop()
+            data = LocationData(**json.loads(item))
+            key = extract_base_url(data.websiteUri)
+            item_text = search_data(data)
+            put_item.set(key, item_text)
+        except KeyboardInterrupt:
+            print("Keyboard Interrupt detected, breaking")
+        except Exception as e:
+            print("Exception: ", e)
 
-menu = requests.get(example_url).content
 
+# We want to keep each process on a single thread so that it
+# can be optimized easily from the infrastructure side
+if __name__ == '__main__':
+    client = create_redis_client()
+    main_program(client)
