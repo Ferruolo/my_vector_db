@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use crate::node_interface::NodeInterface;
 use tch::Tensor;
 
@@ -15,6 +16,30 @@ pub(crate) enum TreeNode<T> {
 pub(crate) enum ChildType<T> {
     Data(T),
     Node(TreeNode<T>),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) enum Response {
+    Success,
+    Error(String),
+    Data(Vec<String>),
+    Indexes(Vec<usize>)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub (crate) struct InsertRequest {
+    pub(crate) entry: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub (crate) struct GetRequest {
+    query: String,
+}
+
+pub (crate) enum Request {
+    Insert { id: String, text: String },
+    Get { id: String },
+    Shutdown,
 }
 
 impl<T> NodeInterface<T> for Node<T> {

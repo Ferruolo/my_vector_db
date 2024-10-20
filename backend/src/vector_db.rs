@@ -7,14 +7,14 @@ use tch::{Device, Tensor};
 
 const ELEMENTS_PER_PAGE: usize = 10;
 
-pub(crate) struct VectorDB<T> {
+pub(crate) struct VectorDB<T: Clone> {
     data: Vec<TreeNode<T>>,
     indexes: Vec<Tensor>,
     embedding_item: LlamafileEmbedding,
     zero: Tensor,
 }
 
-impl<T> VectorDB<T> {
+impl<T: Clone> VectorDB<T> {
     pub fn new(model_path: &str, dims: usize) -> Self {
         let zero = Tensor::zeros(&[dims as i64], (tch::Kind::Float, Device::Cuda(0)));
         let embedding_model = LlamafileEmbedding::new(model_path);
@@ -40,7 +40,7 @@ impl<T> VectorDB<T> {
         };
     }
 
-    pub fn get_top_k_indexes(self, query_string: String, k: usize) -> Vec<usize> {
+    pub fn get_top_k_indexes(&self, query_string: String, k: usize) -> Vec<usize> {
         let query = self.embedding_item.get_embedding(query_string.as_str());
         let mut index_vec = vec![];
         let mut dist_vec: Vec<f32> = vec![];
@@ -65,6 +65,28 @@ impl<T> VectorDB<T> {
             }
         }
         index_vec
+    }
+
+    pub fn get_indexes(&self, indices: Vec<usize>) -> Vec<String> {
+        let mut index_data: Vec<String> = Vec::new();
+        for index in indices {
+            let node_index = index / ELEMENTS_PER_PAGE;
+            let item_index = index % ELEMENTS_PER_PAGE;
+            let node = match self.data.get(node_index).unwrap() {
+                LeafNode(x) => {x}
+                _ => {panic!("Node invalid")}
+            };
+            let new_data= match node.data.get(item_index) {
+                None => {panic!("Invalid Index Provided")}
+                Some(datum) => {datum.clone()}
+            };
+            index_data.push(new_data);
+        }
+        index_data
+    }
+
+    pub fn save(&self) {
+        println!("You need to implement save you idiot!");
     }
 }
 
