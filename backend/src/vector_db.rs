@@ -36,7 +36,7 @@ impl<T: Clone> VectorDB<T> {
             }));
         } else {
             let loc = binary_search(&self.indexes, &query, &compare_func);
-            insert_into_tree_node(self.data[loc], new_data, query, compare_func);
+            // insert_into_tree_node(self.data[loc], new_data, query, compare_func);
         };
     }
 
