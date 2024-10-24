@@ -5,8 +5,8 @@ use std::error::Error;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Bind the server to localhost:3000
-    let listener = TcpListener::bind("127.0.0.1:3000").await?;
-    println!("Server listening on http://127.0.0.1:3000");
+    let listener = TcpListener::bind("0.0.0.0:3000").await?;
+    println!("Server listening on http://0.0.0.0:3000");
 
     loop {
         // Accept new connectionsq

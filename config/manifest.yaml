@@ -128,7 +128,7 @@ kind: Deployment
 metadata:
   name: tokio-server
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: tokio-server
@@ -189,7 +189,7 @@ spec:
   rules:
   - http:
       paths:
-      - path: /api
+      - path: /
         pathType: Prefix
         backend:
           service:

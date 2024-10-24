@@ -25,7 +25,7 @@ RUN cargo build --release
 FROM debian:bullseye-slim AS runtime
 
 # Copy the built binary from builder
-COPY --from=builder /usr/src/app/server/* /usr/local/bin/server
+COPY --from=builder /usr/src/app/server/target/release/test_rust_backend /usr/local/bin/server
 
 # Expose the port the server listens on
 EXPOSE 3000
