@@ -89,13 +89,15 @@ def search_data(data: LocationData):
 def main_program(redis_client: Redis):
     push, pop, length, is_empty = create_redis_queue(redis_client, "search_queue")
     put_item, delete_item, fetch_item = create_document_db_interface(redis_client)
-    while not is_empty():
+    print("Entering Main Loop")
+    while True:
         try:
             item = pop()
             data = LocationData(**json.loads(item))
             key = extract_base_url(data.websiteUri)
+            print(key)
             item_text = search_data(data)
-            put_item.set(key, item_text)
+            put_item(key, item_text)
         except KeyboardInterrupt:
             print("Keyboard Interrupt detected, breaking")
         except Exception as e:

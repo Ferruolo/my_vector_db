@@ -1,0 +1,12 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+COPY scrape_website ./scrape_website
+COPY shared ./shared
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+CMD ["python", "-m", "scrape_website.main"]
+

@@ -10,7 +10,7 @@ dotenv.load_dotenv()
 start_lat = 40.8268
 end_lat = 40.6973
 start_long = -74.0588
-end_long = -73.9181
+end_long = -73.9180
 
 
 def search_nearby_places(api_key, lat, long, radius):
@@ -59,6 +59,7 @@ def search_grid_area(api_key: str, client: Redis, lat_start, lat_end, long_start
     #TODO: Not perfect, but works for now
     idx = 0
     while lat > lat_end:
+        print("Starting from top of lat")
         while long < long_end:
             print(f"{idx}: Fetching data for ({lat:.04f}, {long:.04f})")
             data = search_nearby_places(api_key, lat, long, radius)
@@ -74,5 +75,4 @@ def search_grid_area(api_key: str, client: Redis, lat_start, lat_end, long_start
 if __name__ == '__main__':
     api_key = os.environ.get('GOOGLE_API_KEY')
     client = create_redis_client()
-    print("HELLO WORLD")
     search_grid_area(api_key, client, start_lat, end_lat, start_long, end_long, 500, 1000)

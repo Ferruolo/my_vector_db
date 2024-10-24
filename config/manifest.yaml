@@ -64,7 +64,7 @@ kind: Deployment
 metadata:
   name: lead-finder
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: lead-finder
@@ -77,6 +77,12 @@ spec:
       - name: lead-finder
         image: lead-finder:latest
         imagePullPolicy: Never
+        env:
+        - name: GOOGLE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: google-api-secret
+              key: google-api-key
         envFrom:
         - configMapRef:
             name: redis-config

@@ -36,8 +36,7 @@ class BloomFilter:
         self.expected_entries = expected_entries
         self.bit_arr = bytearray(self.capacity // 8)
         self.k = math.floor((self.capacity / self.expected_entries) * math.log(2))
-        prob_collision = (1 - math.exp(-self.k * self.expected_entries / self.capacity)) ** self.k
-        print(f"Bloom Filter created with collision probability {prob_collision}")
+        # prob_collision = (1 - math.exp(-self.k * self.expected_entries / self.capacity)) ** self.k
 
     def add_item(self, key: str):
         index = chained_fnv1a(key, self.k) % self.capacity

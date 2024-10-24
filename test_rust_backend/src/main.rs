@@ -9,7 +9,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Server listening on http://127.0.0.1:3000");
 
     loop {
-        // Accept new connections
+        // Accept new connectionsq
         let (mut socket, addr) = listener.accept().await?;
 
         // Spawn a new task for each connection
