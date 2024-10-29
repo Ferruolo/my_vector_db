@@ -3,7 +3,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
-use crate::db_interface::DbCalls::{FindIndexes, Insert, Null};
+use crate::db_interface::DbCalls::{FetchIndexData, FindIndexes, Insert, Null};
 use crate::types::{InsertRequest, Response};
 
 const NUM_INDEXES: usize = 10;
@@ -31,14 +31,13 @@ pub fn db_interface(llamafile_path: &str, dims: usize) -> (JoinHandle<()>, Sende
                     let indexes = vector_db.get_top_k_indexes(x, NUM_INDEXES);
                     return_sender.send(Response::Indexes(indexes)).unwrap();
                 }
-                DbCalls::FetchIndexData(indices, return_address) => {
+                FetchIndexData(indices, return_address) => {
                     let data = vector_db.get_indexes(indices);
                     return_address.send(Response::Data(data)).unwrap()
                 }
-                DbCalls::Kill => {
+                Kill => {
                     break
                 }
-                _ => {}
             }
         }
     });

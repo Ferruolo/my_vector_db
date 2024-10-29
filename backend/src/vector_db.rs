@@ -1,3 +1,4 @@
+use std::mem::swap;
 use crate::helpers::{binary_search, binary_search_floats, compare, cosine_similarity_rust_float};
 use crate::llama_embedding::LlamafileEmbedding;
 use crate::node_interface::NodeInterface;
@@ -36,7 +37,9 @@ impl<T: Clone> VectorDB<T> {
             }));
         } else {
             let loc = binary_search(&self.indexes, &query, &compare_func);
-            insert_into_tree_node(self.data[loc], new_data, query, compare_func);
+            let mut item = Null;
+            swap(&mut item, &mut self.data[loc]);
+            insert_into_tree_node(item, new_data, query, compare_func);
         };
     }
 
