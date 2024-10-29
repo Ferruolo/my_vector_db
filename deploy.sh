@@ -16,21 +16,24 @@ cat config/secret-template.yaml | \
 # Apply configurations
 kubectl apply -f config/secret.yaml
 
+rm -f config/secret.yaml
 # rm -f config/secret.yaml
 
 # Build images
 cd scraper
 docker build -t lead-finder:latest -f Dockerfile.lead_finder .
 docker build -t scraper:latest -f Dockerfile.scraper .
-cd ../test_rust_backend
-docker build -t tokio-server:latest -f Dockerfile .
 
+cd ../llama_server
+docker build -t llama-server:latest -f Dockerfile .
 cd ..
+
+kubectl apply -f config/manifest.yaml
 # Load into Kind cluster
 kind load docker-image lead-finder:latest --name kind
 kind load docker-image scraper:latest --name kind
 kind load docker-image redis:latest --name kind
-kind load docker-image tokio-server:latest --name kind
+kind load docker-image llama-server:latest --name kind
 
 kubectl apply -f config/manifest.yaml
 
