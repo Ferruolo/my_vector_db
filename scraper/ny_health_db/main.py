@@ -37,20 +37,18 @@ class RestaurantDataMigration:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """)
 
-
-
     def create_table(self):
         """Create the restaurant inspections table."""
         self.session.execute("""
             CREATE TABLE IF NOT EXISTS restaurant_inspections (
                 camis bigint,
-                inspection_date timestamp,
+                inspection_date text,
                 dba text,
                 boro text,
                 building text,
                 street text,
                 zipcode decimal,
-                phone bigint,
+                phone text,
                 cuisine_description text,
                 action text,
                 violation_code text,
@@ -58,8 +56,8 @@ class RestaurantDataMigration:
                 critical_flag text,
                 score decimal,
                 grade text,
-                grade_date timestamp,
-                record_date timestamp,
+                grade_date text,
+                record_date text,
                 inspection_type text,
                 latitude decimal,
                 longitude decimal,
@@ -76,47 +74,42 @@ class RestaurantDataMigration:
 
     def clean_data(self, df):
         """Clean and prepare DataFrame for insertion."""
-        # Create a copy to avoid modifying original data
-        # Convert date strings to datetime objects
-        date_columns = ['INSPECTION DATE', 'GRADE DATE', 'RECORD DATE']
-        for col in date_columns:
+        df = df.copy()
+
+        # Convert text columns to string type, replacing nan with None
+        text_columns = ['DBA', 'BORO', 'BUILDING', 'STREET', 'CUISINE DESCRIPTION',
+                       'ACTION', 'VIOLATION CODE', 'VIOLATION DESCRIPTION',
+                       'CRITICAL FLAG', 'GRADE', 'INSPECTION TYPE', "PHONE", 'INSPECTION DATE', 'GRADE DATE', 'RECORD DATE']
+        for col in text_columns:
             if col in df.columns:
-                df[col] = pd.to_datetime(df[col])
+                df[col] = df[col].astype(str).replace('nan', None)
 
-        # Convert numeric strings to appropriate types
-
+        # Handle numeric columns
         numeric_columns = {
-            'CAMIS': ('integer', 0),  # IDs should be integers
-            'ZIPCODE': ('integer', 0),  # ZIP codes are integers
-            'PHONE': ('integer', 0),  # Phone numbers are integers
-            'SCORE': ('integer', 0),  # Scores are integers
-            'Latitude': ('float', 0.0),  # Latitude needs decimal precision
-            'Longitude': ('float', 0.0),  # Longitude needs decimal precision
-            'Community Board': ('integer', 0),  # Board numbers are integers
-            'Council District': ('integer', 0),  # Districts are integers
-            'Census Tract': ('integer', 0),  # Census tracts are integers
-            'BIN': ('integer', 0),  # Building numbers are integers
-            'BBL': ('integer', 0)  # Borough/Block/Lot are integers
+            'CAMIS': ('integer', 0),
+            'ZIPCODE': ('integer', None),
+            'SCORE': ('float', None),
+            'Latitude': ('float', None),
+            'Longitude': ('float', None),
+            'Community Board': ('integer', None),
+            'Council District': ('integer', None),
+            'Census Tract': ('integer', None),
+            'BIN': ('integer', None),
+            'BBL': ('integer', None)
         }
 
         for col, (type_name, default_value) in numeric_columns.items():
             if col in df.columns:
-                # Convert to string first to handle inconsistent formats
-                df[col] = df[col].astype(str)
-
                 def safe_convert(val):
+                    if pd.isna(val) or val == '' or str(val).lower() == 'nan':
+                        return 0
                     try:
-                        if pd.isna(val) or val == '' or val.lower() == 'nan':
-                            return default_value
-                        # For integer types
                         if type_name == 'integer':
+                            # Convert to float first to handle decimal strings
                             return int(float(val))
-                        # For float types
-                        elif type_name == 'float':
-                            return float(val)
-                        return default_value
+                        return float(val)
                     except (ValueError, TypeError):
-                        return default_value
+                        return 0
 
                 df[col] = df[col].apply(safe_convert)
 
@@ -124,25 +117,31 @@ class RestaurantDataMigration:
 
     def prepare_row(self, row):
         """Convert a pandas row to a tuple of values for Cassandra insertion."""
+        # Convert empty strings and 'nan' to None for text fields
+        def clean_text(val):
+            if pd.isna(val) or str(val).lower() == 'nan' or str(val).strip() == '':
+                return None
+            return str(val)
+
         return (
             row['CAMIS'],
             row['INSPECTION DATE'],
-            row['DBA'],
-            row['BORO'],
-            row['BUILDING'],
-            row['STREET'],
+            clean_text(row['DBA']),
+            clean_text(row['BORO']),
+            clean_text(row['BUILDING']),
+            clean_text(row['STREET']),
             row['ZIPCODE'],
             row['PHONE'],
-            row['CUISINE DESCRIPTION'],
-            row['ACTION'],
-            row['VIOLATION CODE'],
-            row['VIOLATION DESCRIPTION'],
-            row['CRITICAL FLAG'],
+            clean_text(row['CUISINE DESCRIPTION']),
+            clean_text(row['ACTION']),
+            clean_text(row['VIOLATION CODE']),
+            clean_text(row['VIOLATION DESCRIPTION']),
+            clean_text(row['CRITICAL FLAG']),
             row['SCORE'],
-            row['GRADE'],
+            clean_text(row['GRADE']),
             row['GRADE DATE'],
             row['RECORD DATE'],
-            row['INSPECTION TYPE'],
+            clean_text(row['INSPECTION TYPE']),
             row['Latitude'],
             row['Longitude'],
             row['Community Board'],
@@ -165,25 +164,30 @@ class RestaurantDataMigration:
         for i in range(0, total_rows, batch_size):
             batch = BatchStatement()
             end_idx = min(i + batch_size, total_rows)
+            current_batch_rows = []
 
             # Create batch of insertions
             for _, row in df.iloc[i:end_idx].iterrows():
                 try:
                     values = self.prepare_row(row)
                     batch.add(self.insert_statement, values)
+                    current_batch_rows.append(values)
                 except Exception as e:
                     print(f"Error preparing row: {e}")
+                    # print(f"Problematic row data: {row}")
                     failed_inserts += 1
                     continue
 
             # Execute batch
-            try:
-                self.session.execute(batch)
-                successful_inserts += len(batch)
-                print(f"Processed {successful_inserts}/{total_rows} rows...")
-            except Exception as e:
-                print(f"Error executing batch: {e}")
-                failed_inserts += len(batch)
+            if current_batch_rows:
+                try:
+                    self.session.execute(batch)
+                    successful_inserts += len(current_batch_rows)
+                    print(f"Processed {successful_inserts}/{total_rows} rows...")
+                except Exception as e:
+                    print(f"Error executing batch: {e}")
+                    print(f"First row in failed batch: {current_batch_rows[0]}")
+                    failed_inserts += len(current_batch_rows)
 
         return {
             'total_rows': total_rows,
@@ -195,34 +199,20 @@ class RestaurantDataMigration:
         """Close the cluster connection."""
         self.cluster.shutdown()
 
-
-# Example usage
 def main():
-    print(os.getcwd())
-    # Read data from CSV (adjust filename as needed)
     df = pd.read_csv("../data/DOHMH_New_York_City_Restaurant_Inspection_Results_20241030.csv")
-    print(len(df))
     df = df.drop_duplicates(subset=['CAMIS'])
-    print(len(df))
     df = df[df['BORO'] == 'Manhattan']
 
-    # Initialize migration
     migrator = RestaurantDataMigration()
-
     try:
-        # Perform migration
         results = migrator.migrate_data(df)
-
-        # Print results
         print("\nMigration Results:")
         print(f"Total rows processed: {results['total_rows']}")
         print(f"Successful inserts: {results['successful_inserts']}")
         print(f"Failed inserts: {results['failed_inserts']}")
-
     finally:
-        # Always close the connection
         migrator.close()
-
 
 if __name__ == "__main__":
     main()
