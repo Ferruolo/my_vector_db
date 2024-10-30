@@ -6,6 +6,7 @@
       <excludeFolder url="file://$MODULE_DIR$/backend/target" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
       <excludeFolder url="file://$MODULE_DIR$/llamaindex_wrapper/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/webscraper_env" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.12 (my_own_rag) (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

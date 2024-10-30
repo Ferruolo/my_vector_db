@@ -1,132 +1,7 @@
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: redis-config
-data:
-  REDIS_HOST: "redis-service"
-  REDIS_PORT: "6379"
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: redis-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: redis
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: redis
-  template:
-    metadata:
-      labels:
-        app: redis
-    spec:
-      containers:
-      - name: redis
-        image: redis:latest
-        ports:
-        - containerPort: 6379
-        volumeMounts:
-        - name: redis-storage
-          mountPath: /data
-      volumes:
-      - name: redis-storage
-        persistentVolumeClaim:
-          claimName: redis-pvc
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: redis-service
-spec:
-  selector:
-    app: redis
-  ports:
-  - port: 6379
-    targetPort: 6379
-  type: ClusterIP
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: lead-finder
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: lead-finder
-  template:
-    metadata:
-      labels:
-        app: lead-finder
-    spec:
-      containers:
-      - name: lead-finder
-        image: lead-finder:latest
-        imagePullPolicy: Never
-        env:
-        - name: GOOGLE_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: google-api-secret
-              key: google-api-key
-        envFrom:
-        - configMapRef:
-            name: redis-config
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: scraper
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: scraper
-  template:
-    metadata:
-      labels:
-        app: scraper
-    spec:
-      containers:
-      - name: scraper
-        image: scraper:latest
-        imagePullPolicy: Never
-        envFrom:
-        - configMapRef:
-            name: redis-config
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
----
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: cassandra
-  labels:
-    app: cassandra
 spec:
   serviceName: cassandra
   replicas: 3
@@ -138,11 +13,9 @@ spec:
       labels:
         app: cassandra
     spec:
-      terminationGracePeriodSeconds: 500
       containers:
       - name: cassandra
-        image: gcr.io/google-samples/cassandra:v13
-        imagePullPolicy: Always
+        image: cassandra:latest
         ports:
         - containerPort: 7000
           name: intra-node
@@ -154,113 +27,40 @@ spec:
           name: cql
         resources:
           limits:
-            cpu: "500m"
-            memory: 1Gi
+            cpu: "2"
+            memory: 4Gi
           requests:
-            cpu: "500m"
-            memory: 1Gi
-        securityContext:
-          capabilities:
-            add:
-              - IPC_LOCK
-        lifecycle:
-          preStop:
-            exec:
-              command: 
-              - /bin/sh
-              - -c
-              - nodetool drain
+            cpu: "1"
+            memory: 2Gi
         env:
-          - name: MAX_HEAP_SIZE
-            value: 512M
-          - name: HEAP_NEWSIZE
-            value: 100M
-          - name: CASSANDRA_SEEDS
-            value: "cassandra-0.cassandra.default.svc.cluster.local"
-          - name: CASSANDRA_CLUSTER_NAME
-            value: "K8Demo"
-          - name: CASSANDRA_DC
-            value: "DC1-K8Demo"
-          - name: CASSANDRA_RACK
-            value: "Rack1-K8Demo"
-          - name: POD_IP
-            valueFrom:
-              fieldRef:
-                fieldPath: status.podIP
-        readinessProbe:
-          exec:
-            command:
-            - /bin/bash
-            - -c
-            - /ready-probe.sh
-          initialDelaySeconds: 15
-          timeoutSeconds: 5
-        # These volume mounts are persistent. They are like inline claims,
-        # but not exactly because the names need to match exactly one of
-        # the stateful pod volumes.
+        - name: CASSANDRA_SEEDS
+          value: "cassandra-0.cassandra.default.svc.cluster.local"
+        - name: MAX_HEAP_SIZE
+          value: 2G
+        - name: HEAP_NEWSIZE
+          value: 512M
         volumeMounts:
         - name: cassandra-data
-          mountPath: /cassandra_data
-  # These are converted to volume claims by the controller
-  # and mounted at the paths mentioned above.
-  # do not use these in production until ssd GCEPersistentDisk or other ssd pd
+          mountPath: /var/lib/cassandra
   volumeClaimTemplates:
   - metadata:
       name: cassandra-data
     spec:
       accessModes: [ "ReadWriteOnce" ]
-      storageClassName: fast
       resources:
         requests:
-          storage: 1Gi
----
-kind: StorageClass
-apiVersion: storage.k8s.io/v1
-metadata:
-  name: fast
-provisioner: k8s.io/minikube-hostpath
-parameters:
-  type: pd-ssd
-
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: llama-server
-  labels:
-    app: llama-server
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: llama-server
-  template:
-    metadata:
-      labels:
-        app: llama-server
-    spec:
-      containers:
-      - name: llama
-        image: llama-server:latest
-        imagePullPolicy: Never
-        ports:
-        - containerPort: 8080
-        resources:
-          requests:
-            memory: "4Gi"
-            cpu: "2"
-          limits:
-            memory: "8Gi"
-            cpu: "4"
+          storage: 10Gi
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: llama-service
+  name: cassandra
+  labels:
+    app: cassandra
 spec:
+  clusterIP: None
   selector:
-    app: llama-server
+    app: cassandra
   ports:
-  - port: 80
-    targetPort: 8080
-  type: ClusterIP
+  - port: 9042
+    name: cql
