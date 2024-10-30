@@ -24,16 +24,16 @@
 # docker build -t lead-finder:latest -f Dockerfile.lead_finder .
 # docker build -t scraper:latest -f Dockerfile.scraper .
 
-# cd ../llama_server
-# docker build -t llama-server:latest -f Dockerfile .
-# cd ..
+cd ../llama_server
+docker build -t llama-server:latest -f Dockerfile .
+cd ..
 
-# kubectl apply -f config/manifest.yaml
+kubectl apply -f config/manifest.yaml
 # Load into Kind cluster
 # kind load docker-image lead-finder:latest --name kind
 # kind load docker-image scraper:latest --name kind
 # kind load docker-image redis:latest --name kind
-# kind load docker-image llama-server:latest --name kind
+kind load docker-image llama-server:latest --name kind
 
 kubectl apply -f config/manifest.yaml
 
