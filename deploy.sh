@@ -24,7 +24,7 @@
 # docker build -t lead-finder:latest -f Dockerfile.lead_finder .
 # docker build -t scraper:latest -f Dockerfile.scraper .
 
-cd ../llama_server
+cd llama_server
 docker build -t llama-server:latest -f Dockerfile .
 cd ..
 
