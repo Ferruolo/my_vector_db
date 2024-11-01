@@ -74,3 +74,7 @@ links = [link.get('href') for link in soup.find_all('a')]
 base_url = extract_base_url(website_link)
 links = list(filter(lambda x: is_internal_link(x, base_url), links))
 links = normalize_links(links, base_url)
+
+
+with open("test.html", 'w') as f:
+    f.write(soup.prettify())
