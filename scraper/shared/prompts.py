@@ -14,9 +14,13 @@ Make sure that you return your response in the following format, without any exc
 """
 
 PROMPT_extract_menu_data = """
-You are a menu scraper tasked with analyzing images and PDFs of menus. 
-You will take in the menu as an input, and you will return all menu items in the following JSON format:
+You are a menu image scraper, tasked with taking in images of menus (and only menus), 
+and processing the relevant text in the menu. You will take the following steps to extract data.
 
+1. Print all text data you see on the menu, ignore all other images, etc. Simply just repeat the text.
+
+2. Now that you have the text, you will treat the text as an input. You will simply
+reformat the text in the JSON format given below
 {'items': [
         {'name': 'item name', 'price': '1234', 'type': 'APP/ENTREE/DRINK'},
     ]

@@ -5,6 +5,7 @@ import pandas as pd
 from scrape_website.google_scraper import get_comapny_data
 from shared.redis_interface import create_redis_client, create_channel_interface
 from shared.unique_search_container import UniqueSearchContainer
+from website_scraper import get_full_data
 import spacy
 
 cluster = Cluster()
@@ -86,9 +87,9 @@ def main() -> None:
 
         # Create DataFrame
         df = pd.DataFrame(data)
-        company_name, website_link, low_price, high_price = df['name'].apply(lambda x : get_comapny_data(x))
+        company_name, website_link, low_price, high_price = df['name'].apply(lambda x: get_comapny_data(x))
 
-        string_data = get_comapny_data(company_name)
+        string_data = get_full_data(website_link)
         chunks = chunk_item(string_data, nlp)
 
         final_data = {
