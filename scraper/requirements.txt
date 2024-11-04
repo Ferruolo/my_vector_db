@@ -2,9 +2,11 @@ aiohappyeyeballs==2.4.3
 aiohttp==3.10.8
 aiosignal==1.3.1
 annotated-types==0.7.0
+anthropic==0.38.0
 anyio==4.6.0
 attrs==24.2.0
 beautifulsoup4==4.12.3
+bs4==0.0.2
 cassandra-driver==3.29.2
 certifi==2024.8.30
 charset-normalizer==3.3.2
@@ -22,6 +24,7 @@ greenlet==3.1.1
 h11==0.14.0
 httpcore==1.0.6
 httpx==0.27.2
+huggingface-hub==0.26.2
 idna==3.10
 Jinja2==3.1.4
 jiter==0.5.0
@@ -66,12 +69,16 @@ openai==1.51.0
 packaging==24.1
 pandas==2.2.3
 pillow==10.4.0
+propcache==0.2.0
 pydantic==2.9.2
 pydantic_core==2.23.4
 pypdf==4.3.1
+PyPDF2==3.0.1
 python-dateutil==2.9.0.post0
+python-dotenv==1.0.1
 pytz==2024.2
 PyYAML==6.0.2
+redis==5.1.1
 regex==2024.9.11
 requests==2.32.3
 setuptools==75.1.0
@@ -83,7 +90,7 @@ striprtf==0.0.26
 sympy==1.13.3
 tenacity==8.5.0
 tiktoken==0.8.0
-torch==2.4.1
+tokenizers==0.20.1
 tqdm==4.66.5
 triton==3.0.0
 typing-inspect==0.9.0
