@@ -58,23 +58,24 @@ def normalize_links(links: List[str], base_url: str) -> List[str]:
 
     return list(normalized_links)
 
-full_context = ""
-#
-# search_container = UniqueSearchContainer(200, 40, useDFS=False)
-# search_container.push(website_link)
 
+def get_full_data(website_link: str) -> str:
+    full_context = ""
+    base_url = extract_base_url(website_link)
 
-link = website_link
-content = requests.get(link).content
-soup = BeautifulSoup(content, "html.parser")
-text = str(soup.getText())
-title = str(soup.find('title').text)
+    search_container = UniqueSearchContainer(200, 40, useDFS=False)
+    search_container.push(website_link)
 
-links = [link.get('href') for link in soup.find_all('a')]
-base_url = extract_base_url(website_link)
-links = list(filter(lambda x: is_internal_link(x, base_url), links))
-links = normalize_links(links, base_url)
+    while not search_container.is_empty():
+        link = website_link
+        content = requests.get(link).content
+        soup = BeautifulSoup(content, "html.parser")
+        text = str(soup.getText())
+        title = str(soup.find('title').text)
 
-
-with open("test.html", 'w') as f:
-    f.write(soup.prettify())
+        links = [link.get('href') for link in soup.find_all('a')]
+        base_url = extract_base_url(website_link)
+        links = list(filter(lambda x: is_internal_link(x, base_url), links))
+        links = normalize_links(links, base_url)
+        [search_container.push(link) for link in links]
+    return full_context
