@@ -1,20 +1,19 @@
 import io
+from io import BytesIO
+from typing import List
+from typing import Optional
+from urllib.parse import urljoin
+from urllib.parse import urlparse
 
 import PyPDF2
-import requests
-from Cython.Build.BuildExecutable import LINKCC
-from bs4 import BeautifulSoup
-from shared.unique_search_container import UniqueSearchContainer
-from typing import Optional, List
-from urllib.parse import urlparse
-from PIL import Image
 import pytesseract
-from io import BytesIO
-from urllib.parse import urljoin
+import requests
+from PIL import Image
+from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from urllib.parse import urlparse
-from typing import Optional
+
+from shared.unique_search_container import UniqueSearchContainer
 
 
 def extract_base_url(url: str) -> Optional[str]:
@@ -26,11 +25,13 @@ def extract_base_url(url: str) -> Optional[str]:
     except Exception:
         return None
 
+
 def is_toast_tab_link(url: str) -> bool:
     if url.lower() == "https://www.toasttab.com":
         return True
     else:
         return False
+
 
 def is_internal_link(url: str, base_site: str) -> bool:
     url_base = extract_base_url(url)
@@ -81,6 +82,7 @@ def get_image_text(image_url: str) -> str:
     extracted_text = pytesseract.image_to_string(image)
     return extracted_text.strip()
 
+
 def extract_pdf_text(pdf_url: str) -> str:
     try:
         response = requests.get(pdf_url)
@@ -94,6 +96,7 @@ def extract_pdf_text(pdf_url: str) -> str:
         return text
     except Exception as e:
         return f"Error processing PDF: {str(e)}"
+
 
 def is_pdf_link(url: str) -> bool:
     try:
@@ -154,9 +157,9 @@ def scrape_toast_tab(url: str):
 def get_full_data(website_link: str) -> str:
     full_context = ""
     base_url = extract_base_url(website_link)
-    search_container = UniqueSearchContainer(200, 40, useDFS=False)
+    search_container = UniqueSearchContainer(1000, 40, useDFS=False)
     search_container.push(website_link)
-
+    print(search_container.search_queue)
     while not search_container.is_empty():
         link = search_container.pop()
         if is_toast_tab_link(link):
@@ -173,7 +176,9 @@ def get_full_data(website_link: str) -> str:
             links = [link.get('href') for link in soup.find_all('a') if link.get('href')]
             links = list(filter(lambda x: is_internal_link(x, base_url), links))
             links = normalize_links(links, base_url)
+            print(links)
             for link in links:
+                print(link)
                 search_container.push(link)
             images = [link.get('src') for link in soup.find_all('img') if link.get('src')]
             images = [urljoin(base_url, img) for img in images]

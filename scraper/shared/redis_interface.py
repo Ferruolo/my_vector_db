@@ -33,7 +33,7 @@ def create_redis_queue(client: Redis, queue_name: str, db_num = 1):
 def create_channel_interface(client: Redis, channel=0):
     def put_item(item_name, data):
         client.select(channel)
-        client.set(item_name, data)
+        client.set(item_name, str(data))
 
     def delete_item(item_name):
         client.select(channel)

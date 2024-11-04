@@ -10,17 +10,19 @@ class UniqueSearchContainer:
         self.useDFS = useDFS
 
     def push(self, key: str):
+        print(key)
         if not self.bloom_filter.get_item(key):
             self.bloom_filter.add_item(key)
             self.search_queue.append(key)  # Appends to RIGHT end
 
-    def pop(self):
+
+    def pop(self) -> str:
         if self.useDFS:
             # pops from right end, emulates stack behavior for depth first search
-            self.search_queue.pop()
+            return self.search_queue.pop()
         else:
             # pops from left end of stack, emulates queue behavior for breadth first search
-            self.search_queue.popleft()
+            return self.search_queue.popleft()
 
     def is_empty(self):
         return len(self.search_queue) == 0
