@@ -1,5 +1,5 @@
 import base64
-from typing import Optional, List
+from typing import Optional, List, Union
 from anthropic import Anthropic
 import os
 import re
@@ -78,8 +78,28 @@ class LlavaWrapper(LLMWrapper):
         return result
 
 
-llava = LlavaWrapper()
-response = llava.make_call(system_prompt=PROMPT_extract_menu_data,
-                           prompt="Extract data as instructed from the following image",
-                           image_paths=["./data/sample-menu.png"])
-print(response)
+class LlamafileWrapper:
+    def __init__(self, base_url: str = "http://localhost:8080"):
+        self.base_url = base_url.rstrip('/')
+
+    def completion(self, prompt: str, system_prompt: str = "") -> str:
+        payload = {
+            "prompt": prompt,
+            "system": system_prompt,
+            "stream": False
+        }
+
+        response = requests.post(f"{self.base_url}/completion", json=payload)
+        response.raise_for_status()
+        return response.json()
+
+    def embedding(self, text: Union[str, List[str]], dims: int = 4096) -> Union[List[float], List[List[float]]]:
+        if isinstance(text, str):
+            payload = {"text": text, "dims": dims}
+            response = requests.post(f"{self.base_url}/embedding", json=payload)
+            response.raise_for_status()
+            return response.json()["embedding"]
+        else:
+            return [self.embedding(t, dims) for t in text]
+
+

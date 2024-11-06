@@ -4,7 +4,7 @@ from typing import List
 from typing import Optional
 from urllib.parse import urljoin
 from urllib.parse import urlparse
-
+import re
 import PyPDF2
 import pytesseract
 import requests
@@ -12,37 +12,11 @@ from PIL import Image
 from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-
+from hashlib import md5
 from shared.unique_search_container import UniqueSearchContainer
 
 
-def extract_base_url(url: str) -> Optional[str]:
-    try:
-        parsed = urlparse(url)
-        if parsed.scheme and parsed.netloc:
-            return f"{parsed.scheme}://{parsed.netloc}"
-        return None
-    except Exception:
-        return None
 
-
-def is_toast_tab_link(url: str) -> bool:
-    if url.lower() == "https://www.toasttab.com":
-        return True
-    else:
-        return False
-
-
-def is_internal_link(url: str, base_site: str) -> bool:
-    url_base = extract_base_url(url)
-    if not url_base:
-        return True
-    if url_base.lower() == "https://www.toasttab.com":
-        return True
-    site_base = extract_base_url(base_site)
-    if not site_base:
-        return False
-    return url_base.lower() == site_base.lower()
 
 
 def normalize_links(links: List[str], base_url: str) -> List[str]:
@@ -159,11 +133,12 @@ def get_full_data(website_link: str) -> str:
     base_url = extract_base_url(website_link)
     search_container = UniqueSearchContainer(1000, 40, useDFS=False)
     search_container.push(website_link)
-    print(search_container.search_queue)
+
     while not search_container.is_empty():
         link = search_container.pop()
+        print(f"Scraping {link}")
         if is_toast_tab_link(link):
-            full_context += (link)
+            full_context += link
         if is_pdf_link(link):
             pdf_text = extract_pdf_text(link)
             full_context += f"{pdf_text}"
@@ -176,15 +151,29 @@ def get_full_data(website_link: str) -> str:
             links = [link.get('href') for link in soup.find_all('a') if link.get('href')]
             links = list(filter(lambda x: is_internal_link(x, base_url), links))
             links = normalize_links(links, base_url)
-            print(links)
+
             for link in links:
-                print(link)
                 search_container.push(link)
+
             images = [link.get('src') for link in soup.find_all('img') if link.get('src')]
             images = [urljoin(base_url, img) for img in images]
+
             full_context += f"\n\n{title}\n{text}"
             for image in images:
                 full_context += get_image_text(image)
+
+            full_context = drop_repeated_newline_regex(full_context)
+            # sentence_set = set()
+            # sentences = []
+            # for line in full_context.split("\n"):
+            #     for sent in line.split("."):
+            #         hash = md5(sent.encode()).hexdigest()
+            #         if hash not in sentence_set:
+            #             sentence_set.add(hash)
+            #             sentences.append(sent)
+            #
+
         except Exception as e:
             full_context += f"\nError processing {link}: {str(e)}"
+
     return full_context

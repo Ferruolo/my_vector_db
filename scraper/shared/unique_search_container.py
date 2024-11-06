@@ -10,7 +10,6 @@ class UniqueSearchContainer:
         self.useDFS = useDFS
 
     def push(self, key: str):
-        print(key)
         if not self.bloom_filter.get_item(key):
             self.bloom_filter.add_item(key)
             self.search_queue.append(key)  # Appends to RIGHT end
