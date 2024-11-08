@@ -14,7 +14,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from hashlib import md5
 from shared.unique_search_container import UniqueSearchContainer
-
+from shared.helpers import extract_base_url, drop_repeated_newline_regex, is_internal_link, is_toast_tab_link
 
 
 
@@ -126,6 +126,17 @@ def scrape_toast_tab(url: str):
 
     finally:
         session.close()
+
+
+
+def get_all_links(website_link: str) -> List[str]:
+    base_url = extract_base_url(website_link)
+    search_container = UniqueSearchContainer(1000, 40, useDFS=False)
+    search_container.push(website_link)
+
+
+
+
 
 
 def get_full_data(website_link: str) -> str:

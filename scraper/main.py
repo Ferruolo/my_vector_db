@@ -4,8 +4,9 @@ from cassandra.cluster import Cluster
 from sqlalchemy import false
 from sqlalchemy.testing import fails
 
+from shared.helpers import drop_repeated_newline_regex
 from scrape_website.google_scraper import get_comapny_data
-from scrape_website.website_scraper import get_full_data, drop_repeated_newline_regex
+from scrape_website.website_scraper import get_full_data
 from shared.llm_wrapper import LlamafileWrapper
 from shared.redis_interface import create_redis_client, create_channel_interface
 from llama_index.core.node_parser import SentenceSplitter
@@ -96,9 +97,10 @@ def main() -> None:
                 string_data = get_full_data(website_link)
                 # print(f"Len Company Data for {name}: {string_data}")
                 string_data = drop_repeated_newline_regex(string_data)
-                with open("data.txt", 'r') as f:
-                    data = f.read() + string_data
-                with open("data.txt", 'w') as f:
+                with open("data/data.txt", 'r') as f:
+                    data = f.read()
+                data += '\n' + string_data
+                with open("data/data.txt", 'w') as f:
                     f.write(data)
 
                 # print(string_data)
