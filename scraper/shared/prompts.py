@@ -26,3 +26,27 @@ reformat the text in the JSON format given below
     ]
 }
 """
+
+
+PROMPT_extract_all_important_links = """
+I am building a database to help people identify the best place to eat based on certain requirements.
+In order to do this, I will have to visit a series of links and scrape data from them. However, 
+as each page contains such a large set of links, I will need to select a small subset that contain valuable data.
+Specifically, I need to extract data that is relavent to the following categories:
+1. What is on the menus (food descriptions, meal names, cost, etc)
+2. What is the "vibe" of the restaurant (is is quaint, fun, romantic, etc)
+3. What is the area the restaurant is in. Is it busy, quiet, dangerous, etc?
+
+I want to avoid the following links:
+1. Any "hallucinated, fake, or dead links"
+2. Terms of service pages, careers pages, or any extraneous information
+3. Any links not specifically mentioned above that do not specifically coordinate the the requested columns.
+
+You Must return the data in the following JSON format:
+
+{
+    "links": ["link1", "link2", "link3", ...],
+}
+"""
+
+

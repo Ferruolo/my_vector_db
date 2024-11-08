@@ -1,12 +1,11 @@
 import pandas as pd
 import spacy
 from cassandra.cluster import Cluster
-from sqlalchemy import false
-from sqlalchemy.testing import fails
-
+import json
+from scrape_website.yelp_interface import YelpInterface
 from shared.helpers import drop_repeated_newline_regex
 from scrape_website.google_scraper import get_comapny_data
-from scrape_website.website_scraper import get_full_data
+from scrape_website.website_scraper import get_full_data, get_all_links
 from shared.llm_wrapper import LlamafileWrapper
 from shared.redis_interface import create_redis_client, create_channel_interface
 from llama_index.core.node_parser import SentenceSplitter
@@ -61,7 +60,7 @@ def main() -> None:
     session.set_keyspace('restaurant_inspections')
 
     prepped_db_call = session.prepare("""
-        SELECT dba as name, cuisine_description, latitude, longitude, street FROM {} 
+        SELECT dba as name, cuisine_description, latitude, longitude, street, building FROM {} 
         WHERE row_index >= ? AND row_index < ?
         ALLOW FILTERING
     """.format(table_name))
@@ -71,6 +70,8 @@ def main() -> None:
 
     if not fetch_item(index_name):
         put_item(index_name, 0)
+
+    yelp = YelpInterface()
 
     while True:
         index_start = int(str(fetch_item(index_name).decode('utf-8')))
@@ -86,32 +87,26 @@ def main() -> None:
         rows = session.execute(prepped_db_call, (index_start, end_index))
         data = [dict(row._asdict()) for row in rows]
 
+
         # Create DataFrame
         df = pd.DataFrame(data)
         print("Fetched Rows")
-        for name in df['name']:
-            print(f"Fetching Data for Company {name}")
-            try:
-                company_name, website_link = get_comapny_data(name)
+        for idx, row in df.iterrows():
+            print(f"Fetching Data for Company {row['name']}")
+            # try:
+            biz_data = yelp.get_website_from_coords(row['name'], row['latitude'], row['longitude'], address=f"{row['building']} {row['street']}")
+            with open("yelp_api.json", 'w') as f:
+                f.write(json.dumps(biz_data))
+                # Get all links
+            links = get_all_links(website_url)
+                # Use LLM to process links
 
-                string_data = get_full_data(website_link)
-                # print(f"Len Company Data for {name}: {string_data}")
-                string_data = drop_repeated_newline_regex(string_data)
-                with open("data/data.txt", 'r') as f:
-                    data = f.read()
-                data += '\n' + string_data
-                with open("data/data.txt", 'w') as f:
-                    f.write(data)
+                # Fetch all data at links
 
-                # print(string_data)
-                # menu = llama.completion(string_data, system_prompt=PROMPT_extract_menu_data)
-                # print("\n\n\n\n MENU \n ------------------------")
-                # print(menu)
-                # assert(false)
-                # chunks = text_splitter.split_text(string_data)
-            except Exception as e:
-                print(f"{name} failed with {e}")
-
+                # LLM processing for menus
+            # except Exception as e:
+            #     print(f"{row['name']} failed with {e}")
+            #
 
 
         #

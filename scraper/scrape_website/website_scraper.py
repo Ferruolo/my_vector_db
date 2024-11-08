@@ -13,6 +13,8 @@ from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from hashlib import md5
+
+from shared.bloomfilter import BloomFilter
 from shared.unique_search_container import UniqueSearchContainer
 from shared.helpers import extract_base_url, drop_repeated_newline_regex, is_internal_link, is_toast_tab_link
 
@@ -133,11 +135,28 @@ def get_all_links(website_link: str) -> List[str]:
     base_url = extract_base_url(website_link)
     search_container = UniqueSearchContainer(1000, 40, useDFS=False)
     search_container.push(website_link)
+    urls = []
+    url_filter = BloomFilter(1000, 100)
+    search_container = UniqueSearchContainer(1000, 40, useDFS=False)
+    search_container.push(website_link)
 
+    while not search_container.is_empty():
+        link = search_container.pop()
+        try:
+            content = requests.get(link).content
+            soup = BeautifulSoup(content, "html.parser")
+            links = [link.get('href') for link in soup.find_all('a') if link.get('href')]
+            links = list(filter(lambda x: is_internal_link(x, base_url), links))
+            links = normalize_links(links, base_url)
 
-
-
-
+            for link in links:
+                search_container.push(link)
+                if not url_filter.get_item(link):
+                    urls.append(link)
+                    url_filter.add_item(link)
+        except Exception as e:
+            print(f"\nError processing {link}: {str(e)}")
+    return urls
 
 def get_full_data(website_link: str) -> str:
     full_context = ""
