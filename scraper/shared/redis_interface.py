@@ -2,7 +2,6 @@ from redis import Redis
 import os
 
 def create_redis_client() -> Redis:
-    print(f"REDIS {os.getenv('REDIS_HOST')}: {os.getenv('REDIS_PORT')}")
     redis_host = os.getenv('REDIS_HOST', 'localhost')
     redis_port = int(os.getenv('REDIS_PORT', 6379))
     client = Redis(host=redis_host, port=redis_port, db=0)

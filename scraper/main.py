@@ -9,7 +9,7 @@ from scrape_website.website_scraper import get_full_data, get_all_links
 from shared.llm_wrapper import LlamafileWrapper
 from shared.redis_interface import create_redis_client, create_channel_interface
 from llama_index.core.node_parser import SentenceSplitter
-from shared.prompts import PROMPT_extract_menu_data
+from shared.prompts import PROMPT_extract_menu_data, PROMPT_extract_all_important_links
 
 table_name = "restaurant_inspections_indexed"
 index_name = "SCRAPER_IDX"
@@ -93,20 +93,27 @@ def main() -> None:
         print("Fetched Rows")
         for idx, row in df.iterrows():
             print(f"Fetching Data for Company {row['name']}")
-            # try:
-            biz_data = yelp.get_website_from_coords(row['name'], row['latitude'], row['longitude'], address=f"{row['building']} {row['street']}")
-            with open("yelp_api.json", 'w') as f:
-                f.write(json.dumps(biz_data))
+            try:
+                biz_data = yelp.get_website_from_coords(row['name'], row['latitude'], row['longitude'], address=f"{row['building']} {row['street']}")
+                selected = biz_data['businesses'][0]
+                with open("yelp_api.json", 'w') as f:
+                    f.write(json.dumps(biz_data))
                 # Get all links
-            links = get_all_links(website_url)
+                url = yelp.extract_url(selected)
+                links = get_all_links(url)
+                result = llama.completion(f"{PROMPT_extract_all_important_links}\n{'\n'.join(links)}", system_prompt="")
+                print(result['content'])
+
+
+
                 # Use LLM to process links
 
                 # Fetch all data at links
 
                 # LLM processing for menus
-            # except Exception as e:
-            #     print(f"{row['name']} failed with {e}")
-            #
+            except Exception as e:
+                print(f"{row['name']} failed with {e}")
+
 
 
         #

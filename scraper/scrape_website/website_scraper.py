@@ -85,7 +85,7 @@ def is_pdf_link(url: str) -> bool:
     return url.lower().endswith('.pdf')
 
 
-def scrape_toast_tab(url: str):
+def scrape_all_text(url: str):
     session = requests.Session()
 
     # Configure retry strategy
@@ -120,7 +120,7 @@ def scrape_toast_tab(url: str):
             timeout=30
         )
         response.raise_for_status()
-        return response
+        return response.text
 
     except requests.exceptions.RequestException as e:
         print(f"Error making request: {e}")
@@ -207,3 +207,5 @@ def get_full_data(website_link: str) -> str:
             full_context += f"\nError processing {link}: {str(e)}"
 
     return full_context
+
+

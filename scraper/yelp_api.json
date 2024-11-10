@@ -1,96 +1,92 @@
 {
   "businesses": [
     {
-      "id": "3bPnaLgZwcniU8oqi6UFDQ",
-      "alias": "makana-hawaiian-bbq-and-poke-new-york-3",
-      "name": "Makana Hawaiian BBQ & Poke",
-      "image_url": "https://s3-media2.fl.yelpcdn.com/bphoto/Hf9LJJKFgHUI3M96yN4ldQ/o.jpg",
-      "is_closed": true,
-      "url": "https://www.yelp.com/biz/makana-hawaiian-bbq-and-poke-new-york-3?adjust_creative=Jp2qOXItE4uGUQL4EsV2vw&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=Jp2qOXItE4uGUQL4EsV2vw",
-      "review_count": 41,
+      "id": "V5Z1MYfOceEBP2-lCrxj0A",
+      "alias": "atomic-wings-new-york-7",
+      "name": "Atomic Wings",
+      "image_url": "https://s3-media2.fl.yelpcdn.com/bphoto/Hw2H6lTaUbfqRLE2iEUDpg/o.jpg",
+      "is_closed": false,
+      "url": "https://www.yelp.com/biz/atomic-wings-new-york-7?adjust_creative=Jp2qOXItE4uGUQL4EsV2vw&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=Jp2qOXItE4uGUQL4EsV2vw",
+      "review_count": 170,
       "categories": [
         {
-          "alias": "hawaiian",
-          "title": "Hawaiian"
+          "alias": "tradamerican",
+          "title": "American"
         },
         {
-          "alias": "bbq",
-          "title": "Barbeque"
-        },
-        {
-          "alias": "poke",
-          "title": "Poke"
+          "alias": "chicken_wings",
+          "title": "Chicken Wings"
         }
       ],
-      "rating": 3.6,
+      "rating": 2.7,
       "coordinates": {
-        "latitude": 40.81843,
-        "longitude": -73.95282
+        "latitude": 40.715648651123,
+        "longitude": -74.0054626464844
       },
       "transactions": [
-        "delivery",
-        "pickup"
+        "pickup",
+        "delivery"
       ],
-      "price": "$$",
+      "price": "$",
       "location": {
-        "address1": "1502 Amsterdam Ave",
-        "address2": null,
+        "address1": "311 Broadway",
+        "address2": "",
         "address3": "",
         "city": "New York",
-        "zip_code": "10031",
+        "zip_code": "10007",
         "country": "US",
         "state": "NY",
         "display_address": [
-          "1502 Amsterdam Ave",
-          "New York, NY 10031"
+          "311 Broadway",
+          "New York, NY 10007"
         ]
       },
-      "phone": "+12123685033",
-      "display_phone": "(212) 368-5033",
-      "distance": 23.103349196104045,
+      "phone": "+12125717667",
+      "display_phone": "(212) 571-7667",
+      "distance": 27.58295857699777,
       "business_hours": [
         {
           "open": [
             {
               "is_overnight": false,
               "start": "1100",
-              "end": "2200",
+              "end": "2300",
               "day": 0
             },
             {
               "is_overnight": false,
               "start": "1100",
-              "end": "2200",
+              "end": "2300",
               "day": 1
             },
             {
               "is_overnight": false,
               "start": "1100",
-              "end": "2200",
+              "end": "2300",
               "day": 2
             },
             {
               "is_overnight": false,
               "start": "1100",
-              "end": "2200",
+              "end": "2300",
               "day": 3
             },
             {
               "is_overnight": false,
               "start": "1100",
-              "end": "2230",
+              "end": "2300",
               "day": 4
             },
             {
               "is_overnight": false,
               "start": "1100",
-              "end": "2230",
+              "end": "2300",
               "day": 5
             },
             {
               "is_overnight": false,
-              "start": "1200",
-              "end": "2200",
+              "start": "1100",
+              "end": "2300",
               "day": 6
             }
           ],
@@ -101,466 +97,16 @@
       "attributes": {
         "business_temp_closed": null,
         "menu_url": null,
-        "open24_hours": null,
-        "waitlist_reservation": null
-      }
-    },
-    {
-      "id": "qvVltqaoMJIyO9v3Rs-E2g",
-      "alias": "makana-bbq-and-poke-new-york-4",
-      "name": "Makana BBQ & Poke",
-      "image_url": "https://s3-media4.fl.yelpcdn.com/bphoto/lfQCZ69iOltAcs6GHVqHSQ/o.jpg",
-      "is_closed": true,
-      "url": "https://www.yelp.com/biz/makana-bbq-and-poke-new-york-4?adjust_creative=Jp2qOXItE4uGUQL4EsV2vw&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=Jp2qOXItE4uGUQL4EsV2vw",
-      "review_count": 250,
-      "categories": [
-        {
-          "alias": "hawaiian",
-          "title": "Hawaiian"
-        },
-        {
-          "alias": "bbq",
-          "title": "Barbeque"
-        },
-        {
-          "alias": "poke",
-          "title": "Poke"
-        }
-      ],
-      "rating": 3.4,
-      "coordinates": {
-        "latitude": 40.8003498753624,
-        "longitude": -73.9650623620337
-      },
-      "transactions": [
-        "delivery",
-        "pickup"
-      ],
-      "price": "$$",
-      "location": {
-        "address1": "161 W 106th St",
-        "address2": null,
-        "address3": null,
-        "city": "New York",
-        "zip_code": "10025",
-        "country": "US",
-        "state": "NY",
-        "display_address": [
-          "161 W 106th St",
-          "New York, NY 10025"
-        ]
-      },
-      "phone": "+12126784569",
-      "display_phone": "(212) 678-4569",
-      "distance": 2261.7385134179854,
-      "business_hours": [
-        {
-          "open": [
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2045",
-              "day": 0
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2045",
-              "day": 1
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2045",
-              "day": 2
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2045",
-              "day": 3
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2115",
-              "day": 4
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2115",
-              "day": 5
-            },
-            {
-              "is_overnight": false,
-              "start": "1200",
-              "end": "2115",
-              "day": 6
-            }
-          ],
-          "hours_type": "REGULAR",
-          "is_open_now": true
-        }
-      ],
-      "attributes": {
-        "business_temp_closed": null,
-        "menu_url": "https://www.makanabbq.com/uws",
-        "open24_hours": null,
-        "waitlist_reservation": null
-      }
-    },
-    {
-      "id": "NQbh8zKPqILV6WeYSOM-yQ",
-      "alias": "makana-hawaiian-and-japanese-bbq-new-york",
-      "name": "Makana Hawaiian & Japanese BBQ",
-      "image_url": "https://s3-media3.fl.yelpcdn.com/bphoto/xgIe84u9M61RE3AdlWi-5A/o.jpg",
-      "is_closed": false,
-      "url": "https://www.yelp.com/biz/makana-hawaiian-and-japanese-bbq-new-york?adjust_creative=Jp2qOXItE4uGUQL4EsV2vw&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=Jp2qOXItE4uGUQL4EsV2vw",
-      "review_count": 202,
-      "categories": [
-        {
-          "alias": "bbq",
-          "title": "Barbeque"
-        },
-        {
-          "alias": "japanese",
-          "title": "Japanese"
-        },
-        {
-          "alias": "hawaiian",
-          "title": "Hawaiian"
-        }
-      ],
-      "rating": 3.2,
-      "coordinates": {
-        "latitude": 40.795659815795595,
-        "longitude": -73.93590213192212
-      },
-      "transactions": [
-        "delivery",
-        "pickup"
-      ],
-      "price": "$$",
-      "location": {
-        "address1": "2245 1st Ave",
-        "address2": "",
-        "address3": "",
-        "city": "New York",
-        "zip_code": "10029",
-        "country": "US",
-        "state": "NY",
-        "display_address": [
-          "2245 1st Ave",
-          "New York, NY 10029"
-        ]
-      },
-      "phone": "+12129963534",
-      "display_phone": "(212) 996-3534",
-      "distance": 2891.9709087118263,
-      "business_hours": [
-        {
-          "open": [
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2200",
-              "day": 0
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2200",
-              "day": 1
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2200",
-              "day": 2
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2200",
-              "day": 3
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2230",
-              "day": 4
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2230",
-              "day": 5
-            },
-            {
-              "is_overnight": false,
-              "start": "1200",
-              "end": "2200",
-              "day": 6
-            }
-          ],
-          "hours_type": "REGULAR",
-          "is_open_now": true
-        }
-      ],
-      "attributes": {
-        "business_temp_closed": null,
-        "menu_url": "https://makanatogo.com/menu/",
-        "open24_hours": null,
-        "waitlist_reservation": null
-      }
-    },
-    {
-      "id": "gHJ5FxwrxRhZw1CQxxc3Pw",
-      "alias": "makana-new-york-5",
-      "name": "Makana",
-      "image_url": "https://s3-media2.fl.yelpcdn.com/bphoto/InXMPKBbPAYaxaXmdQwzZw/o.jpg",
-      "is_closed": false,
-      "url": "https://www.yelp.com/biz/makana-new-york-5?adjust_creative=Jp2qOXItE4uGUQL4EsV2vw&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=Jp2qOXItE4uGUQL4EsV2vw",
-      "review_count": 40,
-      "categories": [
-        {
-          "alias": "poke",
-          "title": "Poke"
-        },
-        {
-          "alias": "hawaiian",
-          "title": "Hawaiian"
-        }
-      ],
-      "rating": 3.3,
-      "coordinates": {
-        "latitude": 40.846478986348174,
-        "longitude": -73.93605272504955
-      },
-      "transactions": [
-        "delivery",
-        "pickup"
-      ],
-      "price": "$$",
-      "location": {
-        "address1": "1329 Saint Nicholas Ave",
-        "address2": null,
-        "address3": "",
-        "city": "New York",
-        "zip_code": "10033",
-        "country": "US",
-        "state": "NY",
-        "display_address": [
-          "1329 Saint Nicholas Ave",
-          "New York, NY 10033"
-        ]
-      },
-      "phone": "+16468691383",
-      "display_phone": "(646) 869-1383",
-      "distance": 3421.372706167635,
-      "business_hours": [
-        {
-          "open": [
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2100",
-              "day": 0
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2100",
-              "day": 1
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2100",
-              "day": 2
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2100",
-              "day": 3
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2100",
-              "day": 4
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2100",
-              "day": 5
-            },
-            {
-              "is_overnight": false,
-              "start": "1100",
-              "end": "2100",
-              "day": 6
-            }
-          ],
-          "hours_type": "REGULAR",
-          "is_open_now": true
-        }
-      ],
-      "attributes": {
-        "business_temp_closed": null,
-        "menu_url": null,
-        "open24_hours": null,
-        "waitlist_reservation": null
-      }
-    },
-    {
-      "id": "Pfjb9Rn5Th7R-pLXVARwlA",
-      "alias": "jin-ramen-new-york-11",
-      "name": "Jin Ramen",
-      "image_url": "https://s3-media1.fl.yelpcdn.com/bphoto/jCwklW5TZ-Vfq8V6s-wsQA/o.jpg",
-      "is_closed": false,
-      "url": "https://www.yelp.com/biz/jin-ramen-new-york-11?adjust_creative=Jp2qOXItE4uGUQL4EsV2vw&utm_campaign=yelp_api_v3&utm_medium=api_v3_business_search&utm_source=Jp2qOXItE4uGUQL4EsV2vw",
-      "review_count": 1189,
-      "categories": [
-        {
-          "alias": "ramen",
-          "title": "Ramen"
-        }
-      ],
-      "rating": 3.8,
-      "coordinates": {
-        "latitude": 40.81539,
-        "longitude": -73.95885
-      },
-      "transactions": [
-        "delivery",
-        "pickup"
-      ],
-      "price": "$$",
-      "location": {
-        "address1": "3183 Broadway",
-        "address2": "",
-        "address3": "",
-        "city": "New York",
-        "zip_code": "10027",
-        "country": "US",
-        "state": "NY",
-        "display_address": [
-          "3183 Broadway",
-          "New York, NY 10027"
-        ]
-      },
-      "phone": "+16465592862",
-      "display_phone": "(646) 559-2862",
-      "distance": 620.2384120028825,
-      "business_hours": [
-        {
-          "open": [
-            {
-              "is_overnight": false,
-              "start": "1130",
-              "end": "1530",
-              "day": 0
-            },
-            {
-              "is_overnight": false,
-              "start": "1700",
-              "end": "2200",
-              "day": 0
-            },
-            {
-              "is_overnight": false,
-              "start": "1130",
-              "end": "1530",
-              "day": 1
-            },
-            {
-              "is_overnight": false,
-              "start": "1700",
-              "end": "2200",
-              "day": 1
-            },
-            {
-              "is_overnight": false,
-              "start": "1130",
-              "end": "1530",
-              "day": 2
-            },
-            {
-              "is_overnight": false,
-              "start": "1700",
-              "end": "2200",
-              "day": 2
-            },
-            {
-              "is_overnight": false,
-              "start": "1130",
-              "end": "1530",
-              "day": 3
-            },
-            {
-              "is_overnight": false,
-              "start": "1700",
-              "end": "2200",
-              "day": 3
-            },
-            {
-              "is_overnight": false,
-              "start": "1130",
-              "end": "1530",
-              "day": 4
-            },
-            {
-              "is_overnight": false,
-              "start": "1700",
-              "end": "2200",
-              "day": 4
-            },
-            {
-              "is_overnight": false,
-              "start": "1130",
-              "end": "1530",
-              "day": 5
-            },
-            {
-              "is_overnight": false,
-              "start": "1700",
-              "end": "2200",
-              "day": 5
-            },
-            {
-              "is_overnight": false,
-              "start": "1130",
-              "end": "1530",
-              "day": 6
-            },
-            {
-              "is_overnight": false,
-              "start": "1700",
-              "end": "2200",
-              "day": 6
-            }
-          ],
-          "hours_type": "REGULAR",
-          "is_open_now": true
-        }
-      ],
-      "attributes": {
-        "business_temp_closed": null,
-        "menu_url": "https://125.jinramen.com/shop/",
         "open24_hours": null,
         "waitlist_reservation": null
       }
     }
   ],
-  "total": 11,
+  "total": 6300,
   "region": {
     "center": {
-      "longitude": -73.952624051867,
-      "latitude": 40.818380341857
+      "longitude": -74.005205334775,
+      "latitude": 40.715494565459
     }
   }
 }
