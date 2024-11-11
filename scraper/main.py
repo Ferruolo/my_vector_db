@@ -70,7 +70,6 @@ def main() -> None:
     """.format(table_name))
 
     prepped_count_call = session.prepare("""SELECT count(*) as COUNT FROM {}""".format(table_name))
-    text_splitter = SentenceSplitter(chunk_size=512, chunk_overlap=50)
 
     if not fetch_item(index_name):
         put_item(index_name, 0)
@@ -119,8 +118,8 @@ def main() -> None:
 
             all_text = drop_repeated_newline_regex(all_text)
 
-            menu_data = claude.extract_menu_data(text_data)
-            locations = claude.extract_locations(menu_data)
+            menu_data = claude.extract_menu_data(all_text)
+            locations = claude.extract_locations(all_text)
 
             cassandra_id = uuid.uuid4()
             try:
@@ -128,7 +127,6 @@ def main() -> None:
                 add_to_db()
                 # Use LLM to process links
 
-                # Fetch all data at links
 
                  # LLM processing for menus
             except KeyboardInterrupt:

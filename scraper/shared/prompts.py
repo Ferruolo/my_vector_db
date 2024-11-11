@@ -24,7 +24,7 @@ and processing the relevant text in the menu. You will take the following steps 
 2. Now that you have the text, you will treat the text as an input. You will simply
 reformat the text in the JSON format given below
 {'items': [
-        {'name': 'item name', 'price': '1234', 'type': 'APP/ENTREE/DRINK'},
+        {'name': 'item name', 'price': '1234', 'type': 'STARTER/MAIN/DESSERT/DRINK/BOTTLE/SIDE', desc: 'A description of the item'},
     ]
 }
 """
@@ -73,12 +73,40 @@ If no relevant links found, return: {"links": []}
 ANALYZE THESE LINKS:
 """
 
+PROMPT_extract_pdf_data = """
+You are a PDF to Text converter. Your job is to simply take the text given in the attached PDF
+and return it as a basic string of only ASCII characters.
+"""
+
+PROMPT_extract_location_data = """
+Extract all locations from this text and return them as a JSON array with this structure:
+[
+    {
+        "full_address": "complete address string",
+        "components": {
+            "street": "street address",
+            "city": "city name",
+            "state": "state/province",
+            "country": "country name",
+            "postal_code": "postal/zip code"
+        },
+        "context": "any additional location context"
+    }
+]
+"""
+
 
 def format_extract_all_important_links(data: List[str]) -> str:
     prompt = PROMPT_extract_all_important_links + '\n'.join(data)
     prompt += """ [/INST]</s>"""
     return prompt
 
-def format_extract_menu_data(data: List[str]) -> str:
-    prompt = PROMPT_extract_menu_data + '\n'.join(data)
+
+def format_extract_menu_data(data: str) -> str:
+    prompt = PROMPT_extract_menu_data + '\n\n + data'
+    return prompt
+
+
+def format_extract_location_data(data: str) -> str:
+    prompt = PROMPT_extract_location_data + '\n\n + data'
     return prompt

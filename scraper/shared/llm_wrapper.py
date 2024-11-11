@@ -8,6 +8,8 @@ from anthropic import Anthropic
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.text_splitter import TokenTextSplitter
 
+from shared.prompts import PROMPT_extract_pdf_data, format_extract_menu_data, format_extract_location_data
+
 load_dotenv()
 
 
@@ -71,18 +73,7 @@ class ClaudeWrapper(LLMWrapper):
             with open(pdf_link, 'rb') as f:
                 pdf_data = f.read()
 
-        prompt = """Extract all relevant information from this PDF and return it as a JSON object with the following structure:
-        {
-            "title": "document title",
-            "date": "document date if present",
-            "author": "document author if present",
-            "content": {
-                "key_points": [],
-                "sections": {},
-                "tables": [],
-                "metadata": {}
-            }
-        }"""
+        prompt = PROMPT_extract_pdf_data
 
         response = self.make_call(prompt=prompt, file_data=pdf_data, file_type="application/pdf")
 
@@ -92,46 +83,15 @@ class ClaudeWrapper(LLMWrapper):
             return {"error": "Failed to parse JSON response", "raw_response": response}
 
     def extract_menu_data(self, data: str) -> dict:
-        prompt = """Analyze this menu text and return a JSON object with this exact structure:
-        {
-            "categories": [
-                {
-                    "name": "category name",
-                    "items": [
-                        {
-                            "name": "item name",
-                            "price": "price as decimal",
-                            "description": "item description",
-                            "dietary_info": ["dietary tags"]
-                        }
-                    ]
-                }
-            ]
-        }"""
-
-        response = self.make_call(prompt.format(data=data))
-
+        response = self.make_call(format_extract_menu_data(data=data))
         try:
             return json.loads(response)
         except json.JSONDecodeError:
             return {"error": "Failed to parse JSON response", "raw_response": response}
 
     def extract_locations(self, data: str) -> List[dict]:
-        prompt = """Extract all locations from this text and return them as a JSON array with this structure:
-        [
-            {
-                "full_address": "complete address string",
-                "components": {
-                    "street": "street address",
-                    "city": "city name",
-                    "state": "state/province",
-                    "country": "country name",
-                    "postal_code": "postal/zip code"
-                },
-                "context": "any additional location context"
-            }
-        ]"""
 
+        prompt = format_extract_location_data(data)
         response = self.make_call(prompt)
 
         try:
