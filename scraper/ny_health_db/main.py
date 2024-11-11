@@ -1,11 +1,7 @@
 from cassandra.cluster import Cluster, BatchStatement
 from cassandra.auth import PlainTextAuthProvider
-from cassandra.cqltypes import LongType, IntegerType
-from cassandra.query import dict_factory
-from datetime import datetime
 import pandas as pd
-import numpy as np
-import os
+from uuid import uuid4
 
 
 class RestaurantDataMigration:
@@ -28,19 +24,20 @@ class RestaurantDataMigration:
         self.create_table()
         self.insert_statement = self.session.prepare("""
             INSERT INTO restaurant_inspections (
-                camis, inspection_date, dba, boro, building, street, zipcode,
+                item_id, camis, inspection_date, dba, boro, building, street, zipcode,
                 phone, cuisine_description, action, violation_code,
                 violation_description, critical_flag, score, grade,
                 grade_date, record_date, inspection_type, latitude,
                 longitude, community_board, council_district, census_tract,
                 bin, bbl
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """)
 
     def create_table(self):
         """Create the restaurant inspections table."""
         self.session.execute("""
             CREATE TABLE IF NOT EXISTS restaurant_inspections (
+                item_id int PRIMARY KEY,
                 camis bigint,
                 inspection_date text,
                 dba text,
@@ -66,7 +63,6 @@ class RestaurantDataMigration:
                 census_tract decimal,
                 bin decimal,
                 bbl decimal,
-                PRIMARY KEY ((camis))
             )
         """)
 
@@ -115,15 +111,15 @@ class RestaurantDataMigration:
 
         return df
 
-    def prepare_row(self, row):
+    def prepare_row(self, row, index):
         """Convert a pandas row to a tuple of values for Cassandra insertion."""
         # Convert empty strings and 'nan' to None for text fields
         def clean_text(val):
             if pd.isna(val) or str(val).lower() == 'nan' or str(val).strip() == '':
                 return None
             return str(val)
-
         return (
+            index,
             row['CAMIS'],
             row['INSPECTION DATE'],
             clean_text(row['DBA']),
@@ -159,7 +155,7 @@ class RestaurantDataMigration:
         total_rows = len(df)
         successful_inserts = 0
         failed_inserts = 0
-
+        index = 0
         # Process in batches
         for i in range(0, total_rows, batch_size):
             batch = BatchStatement()
@@ -169,7 +165,8 @@ class RestaurantDataMigration:
             # Create batch of insertions
             for _, row in df.iloc[i:end_idx].iterrows():
                 try:
-                    values = self.prepare_row(row)
+                    values = self.prepare_row(row, index)
+                    index += 1
                     batch.add(self.insert_statement, values)
                     current_batch_rows.append(values)
                 except Exception as e:

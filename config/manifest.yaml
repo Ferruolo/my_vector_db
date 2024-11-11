@@ -28,7 +28,7 @@ spec:
         resources:
           limits:
             cpu: "2"
-            memory: 4Gi
+            memory: 2Gi
           requests:
             cpu: "1"
             memory: 2Gi
@@ -36,7 +36,7 @@ spec:
         - name: CASSANDRA_SEEDS
           value: "cassandra-0.cassandra.default.svc.cluster.local"
         - name: MAX_HEAP_SIZE
-          value: 2G
+          value: 1G
         - name: HEAP_NEWSIZE
           value: 512M
         volumeMounts:
@@ -49,7 +49,7 @@ spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
         requests:
-          storage: 10Gi
+          storage: 7Gi
 ---
 apiVersion: v1
 kind: Service

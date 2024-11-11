@@ -7,16 +7,24 @@ CREATE TABLE IF NOT EXISTS businesses (
     supports_pickup BOOLEAN,
     supports_delivery BOOLEAN,
     yelp_rating FLOAT,
-    latitude FLOAT,
-    longitude FLOAT,
+
     price_magnitude INT,
     phone_number TEXT,
     website_url TEXT,
     reservation_link TEXT,
-    building_number INT,
-    street TEXT,
-    city TEXT,
-    state TEXT
+);
+
+
+CREATE TABLE IF NOT EXISTS biz_locations (
+	location_id UUID,
+	biz_id UUID,
+	latitude FLOAT,
+    	longitude FLOAT,
+	building_number INT,
+    	street TEXT,
+    	city TEXT,
+    	state TEXT,
+	PRIMARY KEY(location_id, biz_id)
 );
 
 CREATE TABLE IF NOT EXISTS menu_data (
