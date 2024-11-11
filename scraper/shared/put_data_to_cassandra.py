@@ -1,6 +1,7 @@
-from uuid import UUID, uuid4
+from typing import List, Tuple, Optional, Dict
+from uuid import UUID
+
 from cassandra.cluster import Session
-from typing import List, Tuple, Optional, Dict, Any
 
 
 class CassandraInsertionError(Exception):

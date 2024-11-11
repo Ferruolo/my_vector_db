@@ -3,7 +3,7 @@ from torch.nn.modules.module import T
 
 device_name = 'cuda' if torch.cuda.is_available() else 'mps'
 
-data = torch.load("./backend/Meta-Llama-3.1-8B/consolidated.00.pth", weights_only=False, map_location=torch.device('cpu'))
+data = torch.load("./old_backend/Meta-Llama-3.1-8B/consolidated.00.pth", weights_only=False, map_location=torch.device('cpu'))
 
 class Embedding(torch.nn.Module):
     def __init__(self):
@@ -22,5 +22,5 @@ sample_input = torch.randn(1, 128256).to(dtype=torch.float32)
 traced_model = torch.jit.trace(embedding, sample_input)
 
 # Save the traced model
-torch.jit.save(traced_model, './backend/embedding.pt')
+torch.jit.save(traced_model, './old_backend/embedding.pt')
 

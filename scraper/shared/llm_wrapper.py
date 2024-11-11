@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import json
 import base64
 import requests
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Tuple
 from anthropic import Anthropic
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.text_splitter import TokenTextSplitter
@@ -99,7 +99,7 @@ class ClaudeWrapper(LLMWrapper):
         except json.JSONDecodeError:
             return {"error": "Failed to parse JSON response", "raw_response": response}
 
-    def get_embeddings(self, data: str) -> List[(str, List[float])]:
+    def get_embeddings(self, data: str) -> List[Tuple[str, List[float]]]:
         sentence_splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=200, paragraph_separator="\n\n",
                                              tokenizer=TokenTextSplitter())
 

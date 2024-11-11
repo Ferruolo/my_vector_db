@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import List
+from typing import List, Tuple
 from uuid import uuid4
 
 import pandas as pd
@@ -37,7 +37,7 @@ def put_biz_locations(session, locations: List[Location], biz_id):
                                  location.room_number, location.city, location.state)
 
 
-def put_chunks(session: Session, biz_id, embeddings: List[(str, List[float])]):
+def put_chunks(session: Session, biz_id, embeddings: List[Tuple[str, List[float]]]):
     for text, embed in embeddings:
         insert_text_data(session, biz_id, text, embed)
 
