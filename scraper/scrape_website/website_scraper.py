@@ -1,10 +1,8 @@
 import io
 from io import BytesIO
 from typing import List
-from typing import Optional
 from urllib.parse import urljoin
-from urllib.parse import urlparse
-import re
+
 import PyPDF2
 import pytesseract
 import requests
@@ -12,7 +10,6 @@ from PIL import Image
 from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from hashlib import md5
 
 from shared.bloomfilter import BloomFilter
 from shared.unique_search_container import UniqueSearchContainer

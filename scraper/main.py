@@ -2,7 +2,6 @@ import json
 import uuid
 
 import pandas as pd
-import spacy
 from cassandra.cluster import Cluster
 
 from scrape_website.website_scraper import get_all_links, is_pdf_link

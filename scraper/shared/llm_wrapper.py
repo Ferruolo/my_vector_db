@@ -1,3 +1,4 @@
+import os
 import re
 from dotenv import load_dotenv
 import json
@@ -16,6 +17,15 @@ load_dotenv()
 def _get_media_type(image_path: str) -> str:
     extension = re.search(r'\.(\w+)$', image_path).group(1).lower()
     return f"{extension}"
+
+
+def get_embedding(text, api_key):
+    response = requests.post(
+        "https://api.voyageai.com/v1/embeddings",
+        headers={"Authorization": f"Bearer {api_key}"},
+        json={"model": "voyage-lite-01", "input": text}
+    )
+    return response.json()["data"][0]["embedding"]
 
 
 class LLMWrapper:
@@ -37,8 +47,9 @@ class LLMWrapper:
 class ClaudeWrapper(LLMWrapper):
     def __init__(self, url="", api_key=None, model_name="claude-3-sonnet-20240229"):
         super().__init__(url, api_key)
-        self.client = Anthropic(api_key=self.api_key)
+        self.client = Anthropic(api_key=os.environ.get("CLAUDE_API_KEY"))
         self.model_name = model_name
+        self.voyage_api_key = os.environ.get("VOYAGE_API_KEY")
 
     def make_call(self, prompt: str, system_prompt: Optional[str] = None, image_paths: Optional[List[str]] = None,
                   file_data: Optional[bytes] = None, file_type: Optional[str] = None) -> str:
@@ -109,13 +120,11 @@ class ClaudeWrapper(LLMWrapper):
 
         for chunk in chunks:
             try:
-                embedding_response = self.client.embeddings.create(model="claude-3-embedding-20240229",
-                    input=chunk.text if hasattr(chunk, 'text') else chunk)
-                embeddings.append(embedding_response.embeddings[0])
+                embed = get_embedding(chunk, api_key=self.voyage_api_key)
+                embeddings.append(embed)
             except Exception as e:
                 print(f"Error generating embedding: {str(e)}")
                 continue
-
         return embeddings
 
 
