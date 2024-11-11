@@ -67,6 +67,8 @@ class YelpInterface:
             selected = list(filter(lambda island: "website" in island.text.lower(), islands))[0]
             dirty_url = selected.find_all('a')[0].get('href')
             url = extract_url(dirty_url)
+            if url is None:
+                raise Exception("Could not find url")
             return url
 
         except requests.exceptions.RequestException as e:

@@ -25,8 +25,8 @@ def insert_business(
         INSERT INTO businesses (
             id, yelp_id, biz_name, supports_pickup, supports_delivery,
             yelp_rating, price_magnitude,
-            phone_number, website_url, reservation_link
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            phone_number, website_url
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         session.execute(query, (
@@ -180,7 +180,7 @@ def insert_business_location(
     try:
         session.execute(
             prepared,
-            (location_id, biz_id, latitude, longitude, building_number, street, city, state)
+            (location_id, biz_id, latitude, longitude, building_number, roomNumber, street, city, state)
         )
     except Exception as e:
         raise CassandraInsertionError(f"Failed to insert business location: {str(e)}")

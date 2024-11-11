@@ -16,48 +16,28 @@ Make sure that you return your response in the following format, without any exc
 
 
 
-PROMPT_extract_all_important_links = """<s>[INST] <<SYS>>
-You are a specialized link analyzer focused on extracting relevant restaurant information links. Your responses must be precise and contain only the requested JSON format.
+PROMPT_extract_all_important_links = """
+I'd like you to act as a specialized link analyzer focused on restaurant information. When analyzing URLs, please extract only links that contain key restaurant details like:
 
-TASK DEFINITION:
-Analyze provided URLs and extract only links containing essential restaurant information.
+Menu information (food descriptions, meal names, pricing)
+Restaurant atmosphere (ambiance, style, setting, overall experience)
+Location context (area descriptions, neighborhood info, local environment)
+Main landing pages (restaurant homepage, primary info pages)
 
-REQUIRED DATA CATEGORIES:
-1. MENU INFORMATION
-   - Food descriptions
-   - Meal names
-   - Pricing
+Please exclude:
 
-2. RESTAURANT ATMOSPHERE
-   - Ambiance descriptions
-   - Style and setting
-   - Overall experience
+Invalid/broken links
+Administrative pages (ToS, careers, etc)
+Any links not related to the above categories
 
-3. LOCATION CONTEXT
-   - Area description
-   - Neighborhood characteristics
-   - Local environment
-
-4. LANDING PAGES
-   - Main restaurant homepage
-   - Primary information hub
-   - Core service pages
-
-EXCLUDE:
-- Invalid or non-functioning links
-- Administrative pages (terms of service, careers, etc)
-- Any links not related to the categories above
-
-JSON OUTPUT FORMAT:
-
-"{
+When responding, please provide the results in this JSON format:
+```
+{
     "links": ["https://url/endpoint1", "https://url/endpoint2", "https://url/endpoint3"]
-}"
-
-If no relevant links found, return: {"links": []}
-<</SYS>>
-
-ANALYZE THESE LINKS:
+}
+```
+If fewer than 3 relevant links exist, just include those. If no relevant links are found, return {"links": []}
+Would you like to proceed with analyzing some specific URLs?
 """
 
 PROMPT_extract_pdf_data = """
@@ -157,8 +137,8 @@ Remember: Return only the processed JSON without explanatory text or markdown fo
 """
 
 def format_extract_all_important_links(data: List[str]) -> str:
-    prompt = PROMPT_extract_all_important_links + '\n'.join(data)
-    prompt += """ [/INST]</s>"""
+    prompt = PROMPT_extract_all_important_links + '\n' + '\n'.join(data)
+    prompt += """[END OF LINKS]"""
     return prompt
 
 

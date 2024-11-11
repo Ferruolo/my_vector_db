@@ -1,11 +1,12 @@
 import re
 from urllib.parse import urlparse
 from typing import Optional
-
+import json
 
 
 def drop_repeated_newline_regex(my_str: str) -> str:
     return re.sub(r'\n\s*\n', '\n', my_str)
+
 
 def extract_base_url(url: str) -> Optional[str]:
     try:
@@ -34,3 +35,16 @@ def is_internal_link(url: str, base_site: str) -> bool:
     if not site_base:
         return False
     return url_base.lower() == site_base.lower()
+
+
+def extract_json(text):
+    pattern = r'\{(?:[^{}]|\{[^{}]*\})*\}'
+    matches = re.finditer(pattern, text)
+
+    for match in matches:
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            continue
+
+    raise ValueError("No valid JSON found in string")

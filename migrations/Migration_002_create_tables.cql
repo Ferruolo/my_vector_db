@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS biz_locations
     latitude        FLOAT,
     longitude       FLOAT,
     building_number INT,
+    room_number     TEXT,
     street          TEXT,
     city            TEXT,
     state           TEXT,
@@ -29,7 +30,7 @@ CREATE TABLE IF NOT EXISTS biz_locations
 
 CREATE TABLE IF NOT EXISTS menu_data
 (
-    item_id     TIMEUUID,
+    item_id     UUID,
     business_id UUID,
     item_name   TEXT,
     item_type   TEXT, -- STARTER, MAIN, DESSERT, DRINK, BOTTLE, SIDE
@@ -40,10 +41,9 @@ CREATE TABLE IF NOT EXISTS menu_data
 
 CREATE TABLE IF NOT EXISTS text_data
 (
-    entry_id       TIMEUUID PRIMARY KEY,
+    entry_id       UUID PRIMARY KEY,
     business_id    UUID,
     text_selection TEXT,
-    source         TEXT,
     embedding      vector<float, 4096>
 );
 
@@ -52,7 +52,7 @@ CREATE CUSTOM INDEX IF NOT EXISTS text_data_vector_idx ON text_data (embedding) 
 
 CREATE TABLE IF NOT EXISTS opening_data
 (
-    entry_id    TIMEUUID,
+    entry_id    UUID,
     business_id UUID,
     /* Both in 24hour syntax (ie 0124, 1245, 1523, etc) */
     open_time   int,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS locations
 
 CREATE TABLE IF NOT EXISTS location_data
 (
-    entry_id    TIMEUUID,
+    entry_id    UUID,
     location_id UUID,
     data        text,
     embedding   vector<float, 4096>,

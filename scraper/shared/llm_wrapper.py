@@ -10,6 +10,7 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.text_splitter import TokenTextSplitter
 from shared.prompts import PROMPT_extract_pdf_data, format_extract_structered_data
 from shared.models import Restaurant
+from shared.helpers import extract_json
 load_dotenv()
 
 
@@ -68,9 +69,9 @@ class ClaudeWrapper(LLMWrapper):
 
         content.append({"type": "text", "text": prompt})
 
-        message = self.client.messages.create(model=self.model_name, max_tokens=1024,
-                                              messages=[{"role": "user", "content": content}],
-                                              system=system_prompt if system_prompt else "")
+        message = self.client.messages.create(model=self.model_name,
+                                              max_tokens=4096,
+                                              messages=[{"role": "user", "content": content}])
 
         try:
             return message.content[0].text
@@ -102,7 +103,7 @@ class ClaudeWrapper(LLMWrapper):
     def get_embeddings(self, data: str) -> List[Tuple[str, List[float]]]:
         sentence_splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=200, paragraph_separator="\n\n",
                                              tokenizer=TokenTextSplitter())
-
+        print(data)
         chunks = sentence_splitter.split_text(data)
         embeddings = []
 
@@ -149,7 +150,7 @@ class LlamafileWrapper:
 
         response = requests.post(f"{self.base_url}/completion", json=payload)
         response.raise_for_status()
-        return response.json()
+        return json_response
 
     def embedding(self, text: Union[str, List[str]], dims: int = 4096) -> Union[List[float], List[List[float]]]:
         if isinstance(text, str):

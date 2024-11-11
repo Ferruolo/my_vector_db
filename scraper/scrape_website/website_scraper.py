@@ -16,8 +16,6 @@ from shared.unique_search_container import UniqueSearchContainer
 from shared.helpers import extract_base_url, drop_repeated_newline_regex, is_internal_link, is_toast_tab_link
 
 
-
-
 def normalize_links(links: List[str], base_url: str) -> List[str]:
     base_url = base_url.rstrip('/')
     normalized_links = set()
@@ -117,7 +115,7 @@ def scrape_all_text(url: str):
             url=url,
             timeout=30
         )
-        full_context = response.text
+        full_context = BeautifulSoup(response.content, 'html.parser').text
 
         base_url = extract_base_url(url)
 
@@ -138,16 +136,13 @@ def scrape_all_text(url: str):
         return ""
 
 
-
-
-
 def get_all_links(website_link: str) -> List[str]:
     base_url = extract_base_url(website_link)
     search_container = UniqueSearchContainer(1000, 40, useDFS=False)
     search_container.push(website_link)
-    urls = []
+    urls = [website_link]
     url_filter = BloomFilter(1000, 100)
-
+    url_filter.add_item(website_link)
     while not search_container.is_empty():
         link = search_container.pop()
         try:
@@ -165,6 +160,7 @@ def get_all_links(website_link: str) -> List[str]:
         except Exception as e:
             print(f"\nError processing {link}: {str(e)}")
     return urls
+
 
 def get_full_data(website_link: str) -> str:
     full_context = ""
@@ -215,5 +211,3 @@ def get_full_data(website_link: str) -> str:
             full_context += f"\nError processing {link}: {str(e)}"
 
     return full_context
-
-

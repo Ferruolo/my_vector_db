@@ -6,17 +6,17 @@ from uuid import uuid4
 import pandas as pd
 from cassandra.cluster import Cluster, Session
 
-from scrape_website.website_scraper import get_all_links, is_pdf_link
+from scrape_website.website_scraper import get_all_links, is_pdf_link, scrape_all_text
 from scrape_website.yelp_interface import YelpInterface
 from shared.extra_apis import get_coordinates
-from shared.helpers import drop_repeated_newline_regex
+from shared.helpers import drop_repeated_newline_regex, extract_json
 from shared.llm_wrapper import LlamafileWrapper, ClaudeWrapper
 from shared.models import Menu, Location
 from shared.prompts import format_extract_all_important_links
 from shared.put_data_to_cassandra import insert_business, insert_menu_item, insert_business_location, insert_text_data
 from shared.redis_interface import create_redis_client, create_channel_interface
 
-table_name = "restaurant_inspections_indexed"
+table_name = "restaurant_inspections"
 index_name = "SCRAPER_IDX"
 incremental_constant = 100
 
@@ -43,7 +43,7 @@ def put_chunks(session: Session, biz_id, embeddings: List[Tuple[str, List[float]
 
 
 def main() -> None:
-    llama = LlamafileWrapper()
+    # llama = LlamafileWrapper()
     claude = ClaudeWrapper()
     redis = create_redis_client()
     (put_item, delete_item, fetch_item) = create_channel_interface(redis, channel=0)
@@ -54,7 +54,7 @@ def main() -> None:
 
     prepped_db_call = session.prepare("""
         SELECT dba as name, cuisine_description, latitude, longitude, street, building FROM {} 
-        WHERE row_index >= ? AND row_index < ?
+        WHERE item_id >= ? AND item_id < ?
         ALLOW FILTERING
     """.format(table_name))
 
@@ -78,10 +78,11 @@ def main() -> None:
 
         rows = session.execute(prepped_db_call, (index_start, end_index))
         data = [dict(row._asdict()) for row in rows]
-
         # Create DataFrame
         df = pd.DataFrame(data)
         for idx, row in df.iterrows():
+            if row['name'] is None:
+                continue
             print(f"Fetching Data for Company {row['name']}")
             # try:
             biz_data = yelp.get_website_from_coords(row['name'], row['latitude'], row['longitude'],
@@ -91,19 +92,21 @@ def main() -> None:
                 f.write(json.dumps(biz_data))
             # Get all links
             url = yelp.extract_url(selected)
+
             links = get_all_links(url)
             print(links)
             print("Parsing with llama")
-            result = llama.completion(format_extract_all_important_links(links))
-
-            links = json.loads(result['content'])['links']
+            response = claude.make_call(format_extract_all_important_links(links))
+            print(response)
+            selected_links = extract_json(response)
+            links = selected_links['links']
 
             all_text = ""
             for link in links:
                 if is_pdf_link(link):
                     all_text += claude.extract_pdf_data(link)
                 else:
-                    all_text += link + '\n\n'
+                    all_text += scrape_all_text(link) + '\n'
 
             all_text = drop_repeated_newline_regex(all_text)
 
@@ -113,6 +116,7 @@ def main() -> None:
 
             biz_id = uuid.uuid4()
             try:
+                session.set_keyspace("restaurant_data")
                 # Use try catch to add atomicity (makes it easier to keep everything straight)
                 insert_business(session, biz_id, selected['name'], selected['id'], "pickup" in selected['transactions'],
                                 "delivery" in selected['transactions'],
@@ -120,11 +124,11 @@ def main() -> None:
                 put_menu_items(session, structured_data.menu, biz_id)
                 put_biz_locations(session, structured_data.locations, biz_id)
                 put_chunks(session, biz_id, text_data)
-
             except KeyboardInterrupt:
                 exit(1)
             except Exception as e:
                 print(f"{row['name']} failed with {e}")  # TODO: Create list of all failures in redis
+            session.set_keyspace("restaurant_inspections")
 
 
 if __name__ == "__main__":
