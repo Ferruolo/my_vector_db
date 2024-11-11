@@ -56,7 +56,8 @@ def get_image_text(image_url: str) -> str:
         image = image.convert('RGB')
 
     extracted_text = pytesseract.image_to_string(image)
-    return extracted_text.strip()
+    ascii_text = ''.join(char for char in extracted_text if ord(char) < 128)
+    return ascii_text.strip()
 
 
 def extract_pdf_text(pdf_url: str) -> str:
@@ -119,15 +120,27 @@ def scrape_all_text(url: str):
             url=url,
             timeout=30
         )
+        full_context = response.text
+
+        base_url = extract_base_url(url)
+
         response.raise_for_status()
-        return response.text
+        soup = BeautifulSoup(response.content, "html.parser")
+        images = [link.get('src') for link in soup.find_all('img') if link.get('src')]
+        images = [urljoin(base_url, img) for img in images]
 
-    except requests.exceptions.RequestException as e:
-        print(f"Error making request: {e}")
-        return None
-
-    finally:
+        for image in images:
+            full_context += get_image_text(image)
         session.close()
+
+        return full_context
+
+    except Exception as e:
+        print(f"Error making request: {e}")
+        session.close()
+        return ""
+
+
 
 
 
@@ -137,8 +150,6 @@ def get_all_links(website_link: str) -> List[str]:
     search_container.push(website_link)
     urls = []
     url_filter = BloomFilter(1000, 100)
-    search_container = UniqueSearchContainer(1000, 40, useDFS=False)
-    search_container.push(website_link)
 
     while not search_container.is_empty():
         link = search_container.pop()

@@ -1,3 +1,5 @@
+from typing import List
+
 # Easier than using a text file, probs not the smartest way to do this tho
 
 
@@ -27,26 +29,56 @@ reformat the text in the JSON format given below
 }
 """
 
+PROMPT_extract_all_important_links = """<s>[INST] <<SYS>>
+You are a specialized link analyzer focused on extracting relevant restaurant information links. Your responses must be precise and contain only the requested JSON format.
 
-PROMPT_extract_all_important_links = """
-I am building a database to help people identify the best place to eat based on certain requirements.
-In order to do this, I will have to visit a series of links and scrape data from them. However, 
-as each page contains such a large set of links, I will need to select a small subset that contain valuable data.
-Specifically, I need to extract data that is relavent to the following categories:
+TASK DEFINITION:
+Analyze provided URLs and extract only links containing essential restaurant information.
 
-1. What is on the menus (food descriptions, meal names, cost, etc)
-2. What is the "vibe" of the restaurant (is is quaint, fun, romantic, etc)
-3. What is the area the restaurant is in. Is it busy, quiet, dangerous, etc?
+REQUIRED DATA CATEGORIES:
+1. MENU INFORMATION
+   - Food descriptions
+   - Meal names
+   - Pricing
 
-I want to avoid the following links:
-1. Any "hallucinated, fake, or dead links"
-2. Terms of service pages, careers pages, or any extraneous information
-3. Any links not specifically mentioned above that do not specifically coordinate the the requested columns.
+2. RESTAURANT ATMOSPHERE
+   - Ambiance descriptions
+   - Style and setting
+   - Overall experience
 
-You must return the data in the following JSON format:
-{
-    "links": ["https://url/endpoint1", "https://url/endpoint1", "https://url/endpoint1"]
-}
+3. LOCATION CONTEXT
+   - Area description
+   - Neighborhood characteristics
+   - Local environment
+
+4. LANDING PAGES
+   - Main restaurant homepage
+   - Primary information hub
+   - Core service pages
+
+EXCLUDE:
+- Invalid or non-functioning links
+- Administrative pages (terms of service, careers, etc)
+- Any links not related to the categories above
+
+JSON OUTPUT FORMAT:
+
+"{
+    "links": ["https://url/endpoint1", "https://url/endpoint2", "https://url/endpoint3"]
+}"
+
+If no relevant links found, return: {"links": []}
+<</SYS>>
+
+ANALYZE THESE LINKS:
 """
 
 
+def format_extract_all_important_links(data: List[str]) -> str:
+    prompt = PROMPT_extract_all_important_links + '\n'.join(data)
+    prompt += """ [/INST]</s>"""
+    return prompt
+
+def format_extract_menu_data(data: List[str]) -> str:
+    prompt = PROMPT_extract_menu_data + '\n'.join(data)
+    return prompt

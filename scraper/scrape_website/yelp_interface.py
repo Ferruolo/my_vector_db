@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 import os
 from bs4 import BeautifulSoup
 import re
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 load_dotenv()
 
@@ -37,13 +39,40 @@ class YelpInterface:
 
     def extract_url(self, yelp_response: dict):
         yelp_url = yelp_response['url']
-        response = requests.get(yelp_url)
-        soup = BeautifulSoup(response.content, "html.parser")
-        with open("sample.html", 'w') as f:
-            f.write(soup.prettify())
-        islands = soup.find_all('div', attrs={'data-testid': 'cookbook-island'})
+        session = requests.Session()
 
-        selected = list(filter(lambda island: "get directions" in island.text.lower(), islands))[0]
-        dirty_url = selected.find_all('a')[0].get('href')
-        url = extract_url(dirty_url)
-        return url
+        # Configure retry strategy
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504]
+        )
+
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        session.headers.update(self.headers)
+
+        try:
+            response = session.request(
+                method='GET',
+                url=yelp_url,
+                timeout=30
+            )
+            response.raise_for_status()
+            soup = BeautifulSoup(response.content, "html.parser")
+            with open("sample.html", 'w') as f:
+                f.write(soup.prettify())
+            islands = soup.find_all('div', attrs={'data-testid': 'cookbook-island'})
+            selected = list(filter(lambda island: "website" in island.text.lower(), islands))[0]
+            dirty_url = selected.find_all('a')[0].get('href')
+            url = extract_url(dirty_url)
+            return url
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error making request: {e}")
+            return None
+
+        finally:
+            session.close()
+
