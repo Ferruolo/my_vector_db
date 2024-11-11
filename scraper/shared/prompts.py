@@ -14,19 +14,7 @@ Make sure that you return your response in the following format, without any exc
 }
 """
 
-PROMPT_extract_menu_data = """
-You are a menu image scraper, tasked with taking in images of menus (and only menus), 
-and processing the relevant text in the menu. You will take the following steps to extract data.
 
-1. Print all text data you see on the menu, ignore all other images, etc. Simply just repeat the text.
-
-2. Now that you have the text, you will treat the text as an input. You will simply
-reformat the text in the JSON format given below
-{'items': [
-        {'name': 'item name', 'price': '1234', 'type': 'STARTER/MAIN/DESSERT/DRINK/BOTTLE/SIDE', desc: 'A description of the item'},
-    ]
-}
-"""
 
 PROMPT_extract_all_important_links = """<s>[INST] <<SYS>>
 You are a specialized link analyzer focused on extracting relevant restaurant information links. Your responses must be precise and contain only the requested JSON format.
@@ -77,23 +65,96 @@ You are a PDF to Text converter. Your job is to simply take the text given in th
 and return it as a basic string of only ASCII characters.
 """
 
-PROMPT_extract_location_data = """
-Extract all locations from this text and return them as a JSON array with this structure:
-[
-    {
-        "full_address": "complete address string",
-        "components": {
-            "street": "street address",
-            "city": "city name",
-            "state": "state/province",
-            "country": "country name",
-            "postal_code": "postal/zip code"
-        },
-        "context": "any additional location context"
-    }
-]
-"""
+PROMPT_extract_structured_Data = """
+You are a specialized data extraction assistant. Your task is to analyze restaurant text input and return structured data about menu items, locations, and reservation capabilities.
 
+Primary Objective:
+Extract and structure menu, location, and reservation information from the provided text into a single, clean JSON response.
+
+Process:
+1. First scan the input for all relevant text, ignoring any non-textual elements
+2. Structure the data according to the schema below
+3. Return the response in valid JSON
+
+Response Schema:
+{
+    "menu": {
+        "items": [
+            {
+                "name": string,          // Full item name
+                "price": string,         // Price including currency symbol
+                "type": enum(           // One of: STARTER, MAIN, DESSERT, DRINK, BOTTLE, SIDE
+                    "STARTER",
+                    "MAIN", 
+                    "DESSERT",
+                    "DRINK",
+                    "BOTTLE",
+                    "SIDE"
+                ),
+                "desc": string          // Full item description
+            }
+        ]
+    },
+    "locations": [
+        {
+            "building_number": number,
+            "room_number": number | null,
+            "street": string,
+            "city": string,             // Default: "New York"
+            "state": string             // Default: "New York"
+        }
+    ],
+    "reservations": {
+        "accepts_reservations": boolean,
+        "platforms": [
+            {
+                "type": enum(           // One of: RESY, OPENTABLE, TOCK, YELP, DIRECT, OTHER
+                    "RESY",
+                    "OPENTABLE",
+                    "TOCK",
+                    "YELP",
+                    "DIRECT",           // For restaurant's own booking system
+                    "OTHER"
+                ),
+                "url": string,          // Direct booking URL
+                "notes": string | null   // Platform-specific notes
+            }
+        ] | null,                       // null when accepts_reservations is false
+        "policy": string | null,        // General reservation policy (e.g., "Walk-ins only", "Large parties only")
+        "restrictions": [               // Array of specific restrictions
+            {
+                "type": string,         // e.g., "party_size", "time_window", "advance_notice"
+                "details": string       // e.g., "Minimum 4 people", "24 hours notice required"
+            }
+        ] | null
+    }
+}
+
+Guidelines:
+- Apply sensible type inference for menu items based on context and positioning
+- Preserve exact price formatting including currency symbols
+- Normalize location data (proper case, standardized street abbreviations)
+- When city/state are absent, default to "New York"
+- Room number should be null when not applicable
+- Each location should be a complete object with all fields present
+- Maintain array structure even for single locations
+
+Reservation Processing Rules:
+- When accepts_reservations is false:
+  * Set platforms to null
+  * Set policy to appropriate message (e.g., "Walk-ins only")
+  * Set restrictions to null
+- When accepts_reservations is true:
+  * Include all available booking platforms
+  * Include complete URLs for each platform
+  * Document any platform-specific notes
+  * List all applicable restrictions
+- Multiple platforms may be available for the same restaurant
+- Capture any specific booking policies or restrictions
+- Include time windows, party size limits, and advance notice requirements
+
+Remember: Return only the processed JSON without explanatory text or markdown formatting.
+"""
 
 def format_extract_all_important_links(data: List[str]) -> str:
     prompt = PROMPT_extract_all_important_links + '\n'.join(data)
@@ -101,11 +162,6 @@ def format_extract_all_important_links(data: List[str]) -> str:
     return prompt
 
 
-def format_extract_menu_data(data: str) -> str:
-    prompt = PROMPT_extract_menu_data + '\n\n' + data
-    return prompt
-
-
-def format_extract_location_data(data: str) -> str:
-    prompt = PROMPT_extract_location_data + '\n\n' + data
+def format_extract_structered_data(data: str) -> str:
+    prompt = PROMPT_extract_structured_Data + data
     return prompt

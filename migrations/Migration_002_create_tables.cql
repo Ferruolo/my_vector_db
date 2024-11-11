@@ -7,24 +7,22 @@ CREATE TABLE IF NOT EXISTS businesses (
     supports_pickup BOOLEAN,
     supports_delivery BOOLEAN,
     yelp_rating FLOAT,
-
     price_magnitude INT,
     phone_number TEXT,
     website_url TEXT,
-    reservation_link TEXT,
 );
 
 
 CREATE TABLE IF NOT EXISTS biz_locations (
-	location_id UUID,
-	biz_id UUID,
-	latitude FLOAT,
-    	longitude FLOAT,
-	building_number INT,
-    	street TEXT,
-    	city TEXT,
-    	state TEXT,
-	PRIMARY KEY(location_id, biz_id)
+	  location_id UUID,
+	  biz_id UUID,
+	  latitude FLOAT,
+    longitude FLOAT,
+	  building_number INT,
+    street TEXT,
+    city TEXT,
+    state TEXT,
+	  PRIMARY KEY(location_id, biz_id)
 );
 
 CREATE TABLE IF NOT EXISTS menu_data (
@@ -84,3 +82,29 @@ USING 'StorageAttachedIndex'
 WITH OPTIONS = {
     'similarity_function': 'cosine'
 };
+
+
+-- Main reservations table with basic info
+CREATE TABLE business_reservations (
+    business_id UUID,
+    accepts_reservations boolean,
+    reservation_policy text,
+    PRIMARY KEY (business_id)
+);
+
+-- Reservation platforms table using composite key
+CREATE TABLE business_reservation_platforms (
+    business_id UUID,
+    platform_type text,  -- RESY, OPENTABLE, TOCK, YELP, DIRECT, OTHER
+    url text,
+    notes text,
+    PRIMARY KEY (business_id, platform_type)
+);
+
+-- Reservation restrictions table using composite key
+CREATE TABLE business_reservation_restrictions (
+    business_id UUID,
+    restriction_type text,
+    restriction_details text,
+    PRIMARY KEY (business_id, restriction_type)
+);

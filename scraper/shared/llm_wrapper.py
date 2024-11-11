@@ -8,9 +8,8 @@ from typing import Optional, List, Union
 from anthropic import Anthropic
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.text_splitter import TokenTextSplitter
-
-from shared.prompts import PROMPT_extract_pdf_data, format_extract_menu_data, format_extract_location_data
-
+from shared.prompts import PROMPT_extract_pdf_data, format_extract_structered_data
+from shared.models import Restaurant
 load_dotenv()
 
 
@@ -64,13 +63,14 @@ class ClaudeWrapper(LLMWrapper):
             for path in image_paths:
                 image_data = self._encode_image(path)
                 content.append({"type": "image",
-                    "source": {"type": "base64", "media_type": f"image/{_get_media_type(path)}",
-                        "data": image_data.decode()}})
+                                "source": {"type": "base64", "media_type": f"image/{_get_media_type(path)}",
+                                           "data": image_data.decode()}})
 
         content.append({"type": "text", "text": prompt})
 
         message = self.client.messages.create(model=self.model_name, max_tokens=1024,
-            messages=[{"role": "user", "content": content}], system=system_prompt if system_prompt else "")
+                                              messages=[{"role": "user", "content": content}],
+                                              system=system_prompt if system_prompt else "")
 
         try:
             return message.content[0].text
@@ -86,34 +86,22 @@ class ClaudeWrapper(LLMWrapper):
                 pdf_data = f.read()
 
         prompt = PROMPT_extract_pdf_data
-
         response = self.make_call(prompt=prompt, file_data=pdf_data, file_type="application/pdf")
-
         try:
             return json.loads(response)
         except json.JSONDecodeError:
             return {"error": "Failed to parse JSON response", "raw_response": response}
 
-    def extract_menu_data(self, data: str) -> dict:
-        response = self.make_call(format_extract_menu_data(data=data))
+    def extract_structured_data(self, data: str) -> Restaurant:
+        response = self.make_call(format_extract_structered_data(data=data))
         try:
-            return json.loads(response)
+            return Restaurant(**json.loads(response))
         except json.JSONDecodeError:
             return {"error": "Failed to parse JSON response", "raw_response": response}
 
-    def extract_locations(self, data: str) -> List[dict]:
-
-        prompt = format_extract_location_data(data)
-        response = self.make_call(prompt)
-
-        try:
-            return json.loads(response)
-        except json.JSONDecodeError:
-            return [{"error": "Failed to parse JSON response", "raw_response": response}]
-
-    def get_embeddings(self, data: str) -> List[List[float]]:
+    def get_embeddings(self, data: str) -> List[(str, List[float])]:
         sentence_splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=200, paragraph_separator="\n\n",
-            tokenizer=TokenTextSplitter())
+                                             tokenizer=TokenTextSplitter())
 
         chunks = sentence_splitter.split_text(data)
         embeddings = []
@@ -121,7 +109,7 @@ class ClaudeWrapper(LLMWrapper):
         for chunk in chunks:
             try:
                 embed = get_embedding(chunk, api_key=self.voyage_api_key)
-                embeddings.append(embed)
+                embeddings.append((chunk, embed))
             except Exception as e:
                 print(f"Error generating embedding: {str(e)}")
                 continue

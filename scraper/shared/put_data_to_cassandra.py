@@ -1,8 +1,5 @@
-from uuid import UUID
+from uuid import UUID, uuid4
 from cassandra.cluster import Session
-from datetime import datetime
-from cassandra.util import datetime_from_uuid1
-import logging
 from typing import List, Tuple, Optional, Dict, Any
 
 
@@ -12,38 +9,29 @@ class CassandraInsertionError(Exception):
 
 def insert_business(
         session: Session,
-        id: UUID,
+        item_id: UUID,
         biz_name: str,
         yelp_id: Optional[str] = None,
         supports_pickup: Optional[bool] = None,
         supports_delivery: Optional[bool] = None,
         yelp_rating: Optional[float] = None,
-        latitude: Optional[float] = None,
-        longitude: Optional[float] = None,
         price_magnitude: Optional[int] = None,
         phone_number: Optional[str] = None,
         website_url: Optional[str] = None,
-        reservation_link: Optional[str] = None,
-        building_number: Optional[int] = None,
-        street: Optional[str] = None,
-        city: Optional[str] = None,
-        state: Optional[str] = None
 ) -> None:
     try:
         query = """
         INSERT INTO businesses (
             id, yelp_id, biz_name, supports_pickup, supports_delivery,
-            yelp_rating, latitude, longitude, price_magnitude,
-            phone_number, website_url, reservation_link,
-            building_number, street, city, state
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            yelp_rating, price_magnitude,
+            phone_number, website_url, reservation_link
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         session.execute(query, (
-            id, yelp_id, biz_name, supports_pickup, supports_delivery,
-            yelp_rating, latitude, longitude, price_magnitude,
-            phone_number, website_url, reservation_link,
-            building_number, street, city, state
+            item_id, yelp_id, biz_name, supports_pickup, supports_delivery,
+            yelp_rating, price_magnitude,
+            phone_number, website_url,
         ))
     except Exception as e:
         raise CassandraInsertionError(f"Failed to insert business record: {str(e)}")
@@ -54,7 +42,7 @@ def insert_menu_item(
         business_id: UUID,
         item_name: str,
         item_type: str,
-        item_price: float,
+        item_price: str,
         item_desc: Optional[str] = None
 ) -> None:
     valid_types = {'STARTER', 'MAIN', 'DESSERT', 'DRINK', 'BOTTLE', 'SIDE'}
@@ -65,7 +53,7 @@ def insert_menu_item(
         query = """
         INSERT INTO menu_data (
             item_id, business_id, item_name, item_type, item_desc, item_price
-        ) VALUES (now(), ?, ?, ?, ?, ?)
+        ) VALUES (uuid4(), ?, ?, ?, ?, ?)
         """
 
         session.execute(query, (
@@ -79,7 +67,6 @@ def insert_text_data(
         session: Session,
         business_id: UUID,
         text_selection: str,
-        source: str,
         embedding: List[float]
 ) -> None:
     if len(embedding) != 4096:
@@ -88,12 +75,12 @@ def insert_text_data(
     try:
         query = """
         INSERT INTO text_data (
-            entry_id, business_id, text_selection, source, embedding
-        ) VALUES (now(), ?, ?, ?, ?)
+            entry_id, business_id, text_selection, embedding
+        ) VALUES (uuid4(), ?, ?, ?)
         """
 
         session.execute(query, (
-            business_id, text_selection, source, embedding
+            business_id, text_selection, embedding
         ))
     except Exception as e:
         raise CassandraInsertionError(f"Failed to insert text data: {str(e)}")
@@ -116,7 +103,7 @@ def insert_opening_hours(
         query = """
         INSERT INTO opening_data (
             entry_id, business_id, open_time, close_time, day_of_week
-        ) VALUES (now(), ?, ?, ?, ?)
+        ) VALUES (uuid4(), ?, ?, ?, ?)
         """
 
         session.execute(query, (
@@ -159,7 +146,7 @@ def insert_location_data(
         query = """
         INSERT INTO location_data (
             entry_id, location_id, data, embedding
-        ) VALUES (now(), ?, ?, ?)
+        ) VALUES (uuid4(), ?, ?, ?)
         """
 
         session.execute(query, (
@@ -167,3 +154,103 @@ def insert_location_data(
         ))
     except Exception as e:
         raise CassandraInsertionError(f"Failed to insert location data: {str(e)}")
+
+
+def insert_business_location(
+        session: Session,
+        location_id: UUID,
+        biz_id: UUID,
+        latitude: float,
+        longitude: float,
+        building_number: str,
+        roomNumber: str,
+        street: str,
+        city: str,
+        state: str
+) -> None:
+    query = """
+        INSERT INTO biz_locations 
+        (location_id, biz_id, latitude, longitude, building_number, roomNumber, street, city, state)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
+
+    prepared = session.prepare(query)
+
+    try:
+        session.execute(
+            prepared,
+            (location_id, biz_id, latitude, longitude, building_number, street, city, state)
+        )
+    except Exception as e:
+        raise CassandraInsertionError(f"Failed to insert business location: {str(e)}")
+
+
+def insert_reservation_data(session: Session, business_id: str, reservation_data: Dict) -> None:
+    try:
+        basic_info_query = """
+            INSERT INTO business_reservations (
+                business_id,
+                accepts_reservations,
+                reservation_policy
+            ) VALUES (?, ?, ?)
+        """
+        session.execute(
+            basic_info_query,
+            (
+                business_id,
+                reservation_data["accepts_reservations"],
+                reservation_data.get("policy")
+            )
+        )
+
+        if reservation_data["accepts_reservations"] and reservation_data.get("platforms"):
+            platform_query = """
+                INSERT INTO business_reservation_platforms (
+                    business_id,
+                    platform_type,
+                    url,
+                    notes
+                ) VALUES (?, ?, ?, ?)
+            """
+            for platform in reservation_data["platforms"]:
+                session.execute(
+                    platform_query,
+                    (
+                        business_id,
+                        platform["type"],
+                        platform["url"],
+                        platform.get("notes")
+                    )
+                )
+
+        if reservation_data.get("restrictions"):
+            restriction_query = """
+                INSERT INTO business_reservation_restrictions (
+                    business_id,
+                    restriction_type,
+                    restriction_details
+                ) VALUES (?, ?, ?)
+            """
+            for restriction in reservation_data["restrictions"]:
+                session.execute(
+                    restriction_query,
+                    (
+                        business_id,
+                        restriction["type"],
+                        restriction["details"]
+                    )
+                )
+    except Exception as e:
+        cleanup_queries = [
+            "DELETE FROM business_reservations WHERE business_id = ?",
+            "DELETE FROM business_reservation_platforms WHERE business_id = ?",
+            "DELETE FROM business_reservation_restrictions WHERE business_id = ?"
+        ]
+
+        for query in cleanup_queries:
+            try:
+                session.execute(query, [business_id])
+            except:
+                pass
+
+        raise CassandraInsertionError(f"Failed to insert reservation data: {str(e)}")
