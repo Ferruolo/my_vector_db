@@ -1,5 +1,4 @@
 from typing import List
-
 # Easier than using a text file, probs not the smartest way to do this tho
 
 
@@ -103,10 +102,10 @@ def format_extract_all_important_links(data: List[str]) -> str:
 
 
 def format_extract_menu_data(data: str) -> str:
-    prompt = PROMPT_extract_menu_data + '\n\n + data'
+    prompt = PROMPT_extract_menu_data + '\n\n' + data
     return prompt
 
 
 def format_extract_location_data(data: str) -> str:
-    prompt = PROMPT_extract_location_data + '\n\n + data'
+    prompt = PROMPT_extract_location_data + '\n\n' + data
     return prompt

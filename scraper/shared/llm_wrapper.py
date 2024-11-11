@@ -13,6 +13,11 @@ from shared.prompts import PROMPT_extract_pdf_data, format_extract_menu_data, fo
 load_dotenv()
 
 
+def _get_media_type(image_path: str) -> str:
+    extension = re.search(r'\.(\w+)$', image_path).group(1).lower()
+    return f"{extension}"
+
+
 class LLMWrapper:
     def __init__(self, url="", api_key=None):
         self.url = url
@@ -23,10 +28,6 @@ class LLMWrapper:
             img = f.read()
         img_base64 = base64.b64encode(img)
         return img_base64
-
-    def _get_media_type(self, image_path: str) -> str:
-        extension = re.search(r'\.(\w+)$', image_path).group(1).lower()
-        return f"{extension}"
 
     def make_call(self, prompt: str, system_prompt: Optional[str] = None,
                   image_paths: Optional[List[str]] = None) -> str:
@@ -52,7 +53,7 @@ class ClaudeWrapper(LLMWrapper):
             for path in image_paths:
                 image_data = self._encode_image(path)
                 content.append({"type": "image",
-                    "source": {"type": "base64", "media_type": f"image/{self._get_media_type(path)}",
+                    "source": {"type": "base64", "media_type": f"image/{_get_media_type(path)}",
                         "data": image_data.decode()}})
 
         content.append({"type": "text", "text": prompt})
@@ -132,7 +133,7 @@ class LlavaWrapper(LLMWrapper):
             for path in image_paths:
                 image_data = self._encode_image(path)
                 payload["images"].append(
-                    {"image": image_data.decode(), "media_type": f"image/{self._get_media_type(path)}"})
+                    {"image": image_data.decode(), "media_type": f"image/{_get_media_type(path)}"})
 
         response = requests.post(f"{self.url}/completion", json=payload)
         if response.status_code != 200:
