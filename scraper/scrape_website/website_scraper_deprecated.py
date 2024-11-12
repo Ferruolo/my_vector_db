@@ -7,10 +7,12 @@ import PyPDF2
 import pytesseract
 import requests
 from PIL import Image
+from PIL.ImageOps import scale
 from bs4 import BeautifulSoup
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from scrape_website.webscraper import Puppeteer
 from shared.bloomfilter import BloomFilter
 from shared.unique_search_container import UniqueSearchContainer
 from shared.helpers import extract_base_url, drop_repeated_newline_regex, is_internal_link, is_toast_tab_link
@@ -45,15 +47,17 @@ def normalize_links(links: List[str], base_url: str) -> List[str]:
 
 
 def get_image_text(image_url: str) -> str:
-    image_content = requests.get(image_url).content
-    image = Image.open(BytesIO(image_content))
-    if image.mode != 'RGB':
-        image = image.convert('RGB')
+    try:
+        image_content = requests.get(image_url).content
+        image = Image.open(BytesIO(image_content))
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
 
-    extracted_text = pytesseract.image_to_string(image)
-    ascii_text = ''.join(char for char in extracted_text if ord(char) < 128)
-    return ascii_text.strip()
-
+        extracted_text = pytesseract.image_to_string(image)
+        ascii_text = ''.join(char for char in extracted_text if ord(char) < 128)
+        return ascii_text.strip()
+    except Exception as e:
+        print(f"Error {e} getting image {image_url}")
 
 def extract_pdf_text(pdf_url: str) -> str:
     try:
@@ -81,58 +85,19 @@ def is_pdf_link(url: str) -> bool:
     return url.lower().endswith('.pdf')
 
 
-def scrape_all_text(url: str):
-    session = requests.Session()
-
-    # Configure retry strategy
-    retry_strategy = Retry(
-        total=3,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504]
-    )
-
-    adapter = HTTPAdapter(max_retries=retry_strategy)
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-
-    session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'DNT': '1',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1'
-    })
-
+async def scrape_all_text(url: str, scraper: Puppeteer):
     try:
-        response = session.request(
-            method='GET',
-            url=url,
-            timeout=30
-        )
-        full_context = BeautifulSoup(response.content, 'html.parser').text
+        await scraper.goto(url)
+        full_context = await scraper.get_text('body')
 
-        base_url = extract_base_url(url)
-
-        response.raise_for_status()
-        soup = BeautifulSoup(response.content, "html.parser")
-        images = [link.get('src') for link in soup.find_all('img') if link.get('src')]
-        images = [urljoin(base_url, img) for img in images]
+        images = await scraper.get_all_images()
 
         for image in images:
             full_context += get_image_text(image)
-        session.close()
 
         return full_context
-
     except Exception as e:
         print(f"Error making request: {e}")
-        session.close()
         return ""
 
 

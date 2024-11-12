@@ -48,3 +48,12 @@ def extract_json(text):
             continue
 
     raise ValueError("No valid JSON found in string")
+
+
+def drop_duplicate_sentences(data: str) -> str:
+    container = set()
+    for line in data.split('\n'):
+        for sent in line.split('.'):
+            container.add(sent)
+    merged = list(container)
+    return '\n'.join(merged)

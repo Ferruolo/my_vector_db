@@ -10,7 +10,7 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.text_splitter import TokenTextSplitter
 from shared.prompts import PROMPT_extract_pdf_data, format_extract_structered_data
 from shared.models import Restaurant
-from shared.helpers import extract_json
+
 load_dotenv()
 
 
@@ -101,7 +101,7 @@ class ClaudeWrapper(LLMWrapper):
             return {"error": "Failed to parse JSON response", "raw_response": response}
 
     def get_embeddings(self, data: str) -> List[Tuple[str, List[float]]]:
-        sentence_splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=200, paragraph_separator="\n\n",
+        sentence_splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=200, paragraph_separator="\n",
                                              tokenizer=TokenTextSplitter())
         print(data)
         chunks = sentence_splitter.split_text(data)
