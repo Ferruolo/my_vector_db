@@ -17,7 +17,9 @@ Make sure that you return your response in the following format, without any exc
 
 
 PROMPT_extract_all_important_links = """
-I'd like you to act as a specialized link analyzer focused on restaurant information. When analyzing URLs, please extract only links that contain key restaurant details like:
+I'd like you to act as a specialized link analyzer focused on restaurant information. 
+You will be given a list of all links for a given website, and your task will be to
+selected a subset of those links which include the following information:
 
 Menu information (food descriptions, meal names, pricing)
 Restaurant atmosphere (ambiance, style, setting, overall experience)

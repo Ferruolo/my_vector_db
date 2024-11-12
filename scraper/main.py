@@ -3,16 +3,15 @@ import json
 import uuid
 from typing import List, Tuple
 from uuid import uuid4
-
 import pandas as pd
 from cassandra.cluster import Cluster, Session
 
 from scrape_website.webscraper import Puppeteer
-from scrape_website.website_scraper_deprecated import get_all_links, is_pdf_link, scrape_all_text
+from scrape_website.website_scraper_deprecated import is_pdf_link, scrape_all_text
 from scrape_website.yelp_interface import YelpInterface
 from shared.extra_apis import get_coordinates
-from shared.helpers import drop_repeated_newline_regex, extract_json, drop_duplicate_sentences
-from shared.llm_wrapper import LlamafileWrapper, ClaudeWrapper
+from shared.helpers import drop_repeated_newline_regex, extract_json
+from shared.llm_wrapper import ClaudeWrapper, ClaudeFailureError
 from shared.models import Menu, Location
 from shared.prompts import format_extract_all_important_links
 from shared.put_data_to_cassandra import insert_business, insert_menu_item, insert_business_location, insert_text_data
@@ -91,7 +90,7 @@ async def main() -> None:
                 print(f"Fetching Data for Company {row['name']}")
                 # try:
                 biz_data = yelp.get_website_from_coords(row['name'], row['latitude'], row['longitude'])
-                if len(biz_data) == 0:
+                if len(biz_data['businesses']) == 0:
                     raise Exception("Yelp Data Not Found")
 
                 selected = biz_data['businesses'][0]
@@ -102,22 +101,20 @@ async def main() -> None:
                 await scraper.goto(url)
                 links = await scraper.get_all_links()
                 print(links)
-                print("Parsing with llama")
-                assert False
+                print("Drop Number of Links")
                 response = claude.make_call(format_extract_all_important_links(links))
-                print(response)
-                selected_links = extract_json(response)
-                links = selected_links['links']
+                print(f"Formatted Links: \n {response}")
+                links = extract_json(response)['links']
 
                 all_text = ""
                 for link in links:
                     if is_pdf_link(link):
                         all_text += claude.extract_pdf_data(link)
                     else:
-                        all_text += scrape_all_text(link) + '\n'
+                        print(f"Fetching {link}")
+                        all_text += (await scrape_all_text(link, scraper)) + '\n'
 
                 all_text = drop_repeated_newline_regex(all_text)
-                # all_text = drop_duplicate_sentences(all_text)
                 with open('data/example.txt', 'w') as f:
                     f.write(all_text)
                 structured_data = claude.extract_structured_data(all_text)
@@ -128,20 +125,46 @@ async def main() -> None:
                 try:
                     session.set_keyspace("restaurant_data")
                     # Use try catch to add atomicity (makes it easier to keep everything straight)
-                    insert_business(session, biz_id, selected['name'], selected['id'], "pickup" in selected['transactions'],
+                    insert_business(session, biz_id, selected['name'], selected['id'],
+                                    "pickup" in selected['transactions'],
                                     "delivery" in selected['transactions'],
                                     selected['rating'], calc_price_magnitude(selected['price']), selected['phone'], url)
                     put_menu_items(session, structured_data.menu, biz_id)
                     put_biz_locations(session, structured_data.locations, biz_id)
                     put_chunks(session, biz_id, text_data)
                 except KeyboardInterrupt:
+                    await scraper.stop()
                     exit(1)
                 except Exception as e:
                     print(f"{row['name']} failed with {e}")  # TODO: Create list of all failures in redis
                 session.set_keyspace("restaurant_inspections")
 
+            except KeyboardInterrupt:
+                print("Keyboard Interrupt detected, Goodbye!")
+                await scraper.stop()
+                await session.close()
+
+                exit(1)
+
+            except ClaudeFailureError:
+                print("Failed due to claude issues. Pay up buddy")
+                await scraper.stop()
+                await session.close()
+
+                exit(1)
+
             except Exception as e:
                 print(f"{row['item_id']} failed with error {e}")
+    await scraper.stop()
+    await session.close()
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        # Run the main function
+        loop.run_until_complete(main())
+    finally:
+        # Clean up
+        loop.close()

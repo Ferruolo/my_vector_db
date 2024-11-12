@@ -1,5 +1,6 @@
 import os
 import re
+
 from dotenv import load_dotenv
 import json
 import base64
@@ -8,11 +9,16 @@ from typing import Optional, List, Union, Tuple
 from anthropic import Anthropic
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.text_splitter import TokenTextSplitter
+
+from shared.helpers import retry_with_backoff
 from shared.prompts import PROMPT_extract_pdf_data, format_extract_structered_data
 from shared.models import Restaurant
 
 load_dotenv()
 
+
+class ClaudeFailureError(Exception):
+    pass
 
 def _get_media_type(image_path: str) -> str:
     extension = re.search(r'\.(\w+)$', image_path).group(1).lower()
@@ -52,7 +58,7 @@ class ClaudeWrapper(LLMWrapper):
         self.voyage_api_key = os.environ.get("VOYAGE_API_KEY")
 
     def make_call(self, prompt: str, system_prompt: Optional[str] = None, image_paths: Optional[List[str]] = None,
-                  file_data: Optional[bytes] = None, file_type: Optional[str] = None) -> str:
+                  file_data: Optional[bytes] = None, file_type: Optional[str] = None, max_retries=10) -> str:
         content = []
 
         if file_data and file_type:
@@ -69,14 +75,18 @@ class ClaudeWrapper(LLMWrapper):
 
         content.append({"type": "text", "text": prompt})
 
-        message = self.client.messages.create(model=self.model_name,
-                                              max_tokens=4096,
-                                              messages=[{"role": "user", "content": content}])
+        @retry_with_backoff()
+        def get_message():
+            message = self.client.messages.create(model=self.model_name,
+                                                  max_tokens=4096,
+                                                  messages=[{"role": "user", "content": content}])
+            return message
 
+        result = get_message()
         try:
-            return message.content[0].text
+            return result.content[0].text
         except (KeyError, IndexError, AttributeError):
-            return ""
+            raise ClaudeFailureError()
 
     def extract_pdf_data(self, pdf_link: str) -> dict:
         if pdf_link.startswith(('http://', 'https://')):
@@ -140,23 +150,22 @@ class LlavaWrapper(LLMWrapper):
         result = response.json()
         return result
 
-
-class LlamafileWrapper:
-    def __init__(self, base_url: str = "http://localhost:8080"):
-        self.base_url = base_url.rstrip('/')
-
-    def completion(self, prompt: str) -> str:
-        payload = {"prompt": prompt, "stream": False, "temperature": 0.7, "top_p": 0.9, "max_tokens": 4096}
-
-        response = requests.post(f"{self.base_url}/completion", json=payload)
-        response.raise_for_status()
-        return json_response
-
-    def embedding(self, text: Union[str, List[str]], dims: int = 4096) -> Union[List[float], List[List[float]]]:
-        if isinstance(text, str):
-            payload = {"text": text, "dims": dims}
-            response = requests.post(f"{self.base_url}/embedding", json=payload)
-            response.raise_for_status()
-            return response.json()["embedding"]
-        else:
-            return [self.embedding(t, dims) for t in text]
+# class LlamafileWrapper:
+#     def __init__(self, base_url: str = "http://localhost:8080"):
+#         self.base_url = base_url.rstrip('/')
+#
+#     def completion(self, prompt: str) -> str:
+#         payload = {"prompt": prompt, "stream": False, "temperature": 0.7, "top_p": 0.9, "max_tokens": 4096}
+#
+#         response = requests.post(f"{self.base_url}/completion", json=payload)
+#         response.raise_for_status()
+#         return json_response
+#
+#     def embedding(self, text: Union[str, List[str]], dims: int = 4096) -> Union[List[float], List[List[float]]]:
+#         if isinstance(text, str):
+#             payload = {"text": text, "dims": dims}
+#             response = requests.post(f"{self.base_url}/embedding", json=payload)
+#             response.raise_for_status()
+#             return response.json()["embedding"]
+#         else:
+#             return [self.embedding(t, dims) for t in text]

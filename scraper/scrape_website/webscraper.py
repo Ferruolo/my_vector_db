@@ -1,6 +1,7 @@
 from typing import Optional, Dict, List, Any
-import asyncio
+from bs4 import BeautifulSoup
 from pyppeteer import launch
+from pyppeteer_stealth import stealth
 
 
 class Puppeteer:
@@ -8,12 +9,13 @@ class Puppeteer:
         self.browser = None
         self.page = None
         self.headless = headless
-        self.user_agent = user_agent or 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        # self.user_agent = user_agent or 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
 
     async def start(self):
         self.browser = await launch(headless=self.headless)
         self.page = await self.browser.newPage()
-        await self.page.setUserAgent(self.user_agent)
+        self.page.setDefaultNavigationTimeout(0)
+        await stealth(self.page)  # Use the async stealth function
 
     async def stop(self):
         if self.browser:
@@ -59,7 +61,7 @@ class Puppeteer:
     async def evaluate(self, js_code: str):
         return await self.page.evaluate(js_code)
 
-    async def get_all_links(self) -> List[Dict[str, str]]:
+    async def get_all_links(self) -> List[str]:
         links = await self.page.evaluate('''
             () => {
                 return Array.from(document.getElementsByTagName('a')).map(link => ({
@@ -74,6 +76,7 @@ class Puppeteer:
                 }));
             }
         ''')
+        links = [link['href'] for link in links]
         return links
 
     async def get_all_images(self) -> List[str]:
@@ -85,3 +88,27 @@ class Puppeteer:
 
         # Filter out data URLs and empty sources
         return [img['src'] for img in images if img['src'] and not img['src'].startswith('data:')]
+
+    async def get_page_soup(self) -> BeautifulSoup:
+        content = await self.page.content()
+        soup = BeautifulSoup(content, 'html.parser')
+        return soup
+
+
+#
+# async def main():
+#     scraper = Puppeteer(headless=False)
+#     try:
+#         await scraper.start()
+#         await scraper.goto('https://www.nytimes.com/')
+#         print(await scraper.get_full_page_text())
+#         print("complete")
+#         await scraper.stop()
+#     except Exception as e:
+#         await scraper.stop()
+#         print(f"Failed with error {e}")
+#         exit(1)
+#
+#
+# if __name__ == '__main__':
+#     asyncio.run(main())

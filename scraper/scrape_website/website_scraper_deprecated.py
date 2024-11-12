@@ -7,15 +7,12 @@ import PyPDF2
 import pytesseract
 import requests
 from PIL import Image
-from PIL.ImageOps import scale
 from bs4 import BeautifulSoup
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 from scrape_website.webscraper import Puppeteer
 from shared.bloomfilter import BloomFilter
-from shared.unique_search_container import UniqueSearchContainer
 from shared.helpers import extract_base_url, drop_repeated_newline_regex, is_internal_link, is_toast_tab_link
+from shared.unique_search_container import UniqueSearchContainer
 
 
 def normalize_links(links: List[str], base_url: str) -> List[str]:
@@ -59,6 +56,7 @@ def get_image_text(image_url: str) -> str:
     except Exception as e:
         print(f"Error {e} getting image {image_url}")
 
+
 def extract_pdf_text(pdf_url: str) -> str:
     try:
         response = requests.get(pdf_url)
@@ -88,14 +86,17 @@ def is_pdf_link(url: str) -> bool:
 async def scrape_all_text(url: str, scraper: Puppeteer):
     try:
         await scraper.goto(url)
-        full_context = await scraper.get_text('body')
+        soup = await scraper.get_page_soup()
+        main_element = soup.find('body')
+        full_text = ""
+        for div in main_element.find_all('div'):
+            full_text += div.text + '\n'
 
-        images = await scraper.get_all_images()
-
+        images = soup.find_all('imgs')
         for image in images:
-            full_context += get_image_text(image)
+            full_text += get_image_text(image)
+        return full_text
 
-        return full_context
     except Exception as e:
         print(f"Error making request: {e}")
         return ""
