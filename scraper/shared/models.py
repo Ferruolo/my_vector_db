@@ -9,7 +9,7 @@ class DisplayName(BaseModel):
 
 class MenuItem(BaseModel):
     name: str
-    price: str
+    price: Optional[float | None]
     type: Literal["STARTER", "MAIN", "DESSERT", "DRINK", "BOTTLE", "SIDE"]
     desc: str
 
@@ -19,7 +19,7 @@ class Menu(BaseModel):
 
 
 class Location(BaseModel):
-    building_number: str
+    building_number: Optional[str] = None
     room_number: Optional[str] = None
     street: str
     city: str = "New York"

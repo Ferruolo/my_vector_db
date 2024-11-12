@@ -9,8 +9,9 @@ from cassandra.cluster import Cluster, Session
 from scrape_website.webscraper import Puppeteer
 from scrape_website.website_scraper_deprecated import is_pdf_link, scrape_all_text
 from scrape_website.yelp_interface import YelpInterface
+
 from shared.extra_apis import get_coordinates
-from shared.helpers import drop_repeated_newline_regex, extract_json
+from shared.helpers import drop_repeated_newline_regex, extract_json, drop_duplicate_sentences, strip_white_space
 from shared.llm_wrapper import ClaudeWrapper, ClaudeFailureError
 from shared.models import Menu, Location
 from shared.prompts import format_extract_all_important_links
@@ -50,8 +51,7 @@ async def main() -> None:
     (put_item, delete_item, fetch_item) = create_channel_interface(redis, channel=0)
     cluster = Cluster()
     session = cluster.connect()
-    table_name = "restaurant_inspections"
-    session.set_keyspace('restaurant_inspections')
+    session.set_keyspace(table_name)
 
     prepped_db_call = session.prepare("""
         SELECT item_id, dba as name, cuisine_description, latitude, longitude, street, building FROM {} 
@@ -60,7 +60,6 @@ async def main() -> None:
     """.format(table_name))
 
     prepped_count_call = session.prepare("""SELECT count(*) as COUNT FROM {}""".format(table_name))
-
     scraper = Puppeteer(headless=False)
 
     if not fetch_item(index_name):
@@ -77,7 +76,7 @@ async def main() -> None:
         else:
             put_item(index_name, end_index)
 
-        print(f"Fetching data for {index_start}-{end_index}")
+        print(f"Fetching rows {index_start}-{end_index}")
 
         rows = session.execute(prepped_db_call, (index_start, end_index))
         data = [dict(row._asdict()) for row in rows]
@@ -87,7 +86,7 @@ async def main() -> None:
             try:
                 if row['name'] is None:
                     raise Exception("Name is Undefined")
-                print(f"Fetching Data for Company {row['name']}")
+                print(f"Fetching data for Company {row['name']}")
                 # try:
                 biz_data = yelp.get_website_from_coords(row['name'], row['latitude'], row['longitude'])
                 if len(biz_data['businesses']) == 0:
@@ -98,6 +97,7 @@ async def main() -> None:
                     f.write(json.dumps(biz_data))
                 # Get all links
                 url = await yelp.extract_url(selected, scraper)
+                print("Successfully fetched yelp url")
                 await scraper.goto(url)
                 links = await scraper.get_all_links()
                 print(links)
@@ -115,6 +115,8 @@ async def main() -> None:
                         all_text += (await scrape_all_text(link, scraper)) + '\n'
 
                 all_text = drop_repeated_newline_regex(all_text)
+                all_text = strip_white_space(all_text)
+                all_text = drop_duplicate_sentences(all_text)
                 with open('data/example.txt', 'w') as f:
                     f.write(all_text)
                 structured_data = claude.extract_structured_data(all_text)
@@ -143,14 +145,12 @@ async def main() -> None:
                 print("Keyboard Interrupt detected, Goodbye!")
                 await scraper.stop()
                 await session.close()
-
                 exit(1)
 
             except ClaudeFailureError:
                 print("Failed due to claude issues. Pay up buddy")
                 await scraper.stop()
                 await session.close()
-
                 exit(1)
 
             except Exception as e:

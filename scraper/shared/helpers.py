@@ -11,6 +11,10 @@ def drop_repeated_newline_regex(my_str: str) -> str:
     return re.sub(r'\n\s*\n', '\n', my_str)
 
 
+def strip_white_space(my_str: str) -> str:
+    return '\n'.join([s.strip() for s in my_str.split('\n')])
+
+
 def extract_base_url(url: str) -> Optional[str]:
     try:
         parsed = urlparse(url)
@@ -40,17 +44,23 @@ def is_internal_link(url: str, base_site: str) -> bool:
     return url_base.lower() == site_base.lower()
 
 
-def extract_json(text):
-    pattern = r'\{(?:[^{}]|\{[^{}]*\})*\}'
-    matches = re.finditer(pattern, text)
+def extract_json(text: str):
+    stack, start = [], -1
 
-    for match in matches:
-        try:
-            return json.loads(match.group())
-        except json.JSONDecodeError:
-            continue
+    for i, c in enumerate(text):
+        if c in '{[':
+            if c == '{' and not stack: start = i
+            stack.append(c)
+        elif c in '}]':
+            if stack and ((c == '}' and stack[-1] == '{') or (c == ']' and stack[-1] == '[')):
+                stack.pop()
+                if not stack and start >= 0:
+                    try:
+                        return json.loads(text[start:i + 1])
+                    except:
+                        continue
 
-    raise ValueError("No valid JSON found in string")
+    raise ValueError("No valid JSON found")
 
 
 def drop_duplicate_sentences(data: str) -> str:

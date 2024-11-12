@@ -1,10 +1,7 @@
 import requests
 from dotenv import load_dotenv
 import os
-from bs4 import BeautifulSoup
 import re
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 from scrape_website.webscraper import Puppeteer
 
@@ -48,6 +45,7 @@ class YelpInterface:
             .filter(island => island.textContent.toLowerCase().includes('website'))[0]
             .querySelector('a').getAttribute('href')
         """)
+
         url = extract_url(dirty_url)
         print(url)
         if url is None:

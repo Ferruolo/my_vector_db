@@ -21,7 +21,7 @@ class Puppeteer:
         if self.browser:
             await self.browser.close()
 
-    async def goto(self, url: str, wait_until: str = 'networkidle0'):
+    async def goto(self, url: str, wait_until: str = 'domcontentloaded'):
         if not self.page:
             await self.start()
         await self.page.goto(url, {'waitUntil': wait_until})

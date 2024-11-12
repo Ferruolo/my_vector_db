@@ -1,4 +1,5 @@
 from typing import List
+
 # Easier than using a text file, probs not the smartest way to do this tho
 
 
@@ -13,8 +14,6 @@ Make sure that you return your response in the following format, without any exc
     'links': [https://myurl.com/path/to/image, https://myurl.com/path/to/image2] 
 }
 """
-
-
 
 PROMPT_extract_all_important_links = """
 I'd like you to act as a specialized link analyzer focused on restaurant information. 
@@ -31,6 +30,7 @@ Please exclude:
 Invalid/broken links
 Administrative pages (ToS, careers, etc)
 Any links not related to the above categories
+Links to Instagram, Facebook, TikTok, or Google
 
 When responding, please provide the results in this JSON format:
 ```
@@ -46,7 +46,6 @@ PROMPT_extract_pdf_data = """
 You are a PDF to Text converter. Your job is to simply take the text given in the attached PDF
 and return it as a basic string of only ASCII characters.
 """
-
 PROMPT_extract_structured_Data = """
 You are a specialized data extraction assistant. Your task is to analyze restaurant text input and return structured data about menu items, locations, and reservation capabilities.
 
@@ -64,7 +63,7 @@ Response Schema:
         "items": [
             {
                 "name": string,          // Full item name
-                "price": string,         // Price including currency symbol
+                "price": float | null,         
                 "type": enum(           // One of: STARTER, MAIN, DESSERT, DRINK, BOTTLE, SIDE
                     "STARTER",
                     "MAIN", 
@@ -73,14 +72,14 @@ Response Schema:
                     "BOTTLE",
                     "SIDE"
                 ),
-                "desc": string          // Full item description
+                "desc": string          // Full item description. If description isn't available, just return empty string
             }
         ]
     },
     "locations": [
         {
-            "building_number": number,
-            "room_number": number | null,
+            "building_number": string,   // Building number as string to handle complex numbers (e.g. "123-125")
+            "room_number": string | null, // Room number as string, null when not applicable
             "street": string,
             "city": string,             // Default: "New York"
             "state": string             // Default: "New York"
@@ -98,7 +97,7 @@ Response Schema:
                     "DIRECT",           // For restaurant's own booking system
                     "OTHER"
                 ),
-                "url": string,          // Direct booking URL
+                "url": string,          // Direct booking URL (must be valid HTTP/HTTPS URL)
                 "notes": string | null   // Platform-specific notes
             }
         ] | null,                       // null when accepts_reservations is false
@@ -114,12 +113,13 @@ Response Schema:
 
 Guidelines:
 - Apply sensible type inference for menu items based on context and positioning
-- Preserve exact price formatting including currency symbols
+- Building numbers and room numbers should be strings to handle complex formats
 - Normalize location data (proper case, standardized street abbreviations)
 - When city/state are absent, default to "New York"
 - Room number should be null when not applicable
 - Each location should be a complete object with all fields present
 - Maintain array structure even for single locations
+- URLs must be valid HTTP/HTTPS URLs
 
 Reservation Processing Rules:
 - When accepts_reservations is false:
@@ -128,7 +128,7 @@ Reservation Processing Rules:
   * Set restrictions to null
 - When accepts_reservations is true:
   * Include all available booking platforms
-  * Include complete URLs for each platform
+  * Include complete URLs for each platform (must be valid HTTP/HTTPS URLs)
   * Document any platform-specific notes
   * List all applicable restrictions
 - Multiple platforms may be available for the same restaurant
@@ -138,12 +138,19 @@ Reservation Processing Rules:
 Remember: Return only the processed JSON without explanatory text or markdown formatting.
 """
 
+
 def format_extract_all_important_links(data: List[str]) -> str:
     prompt = PROMPT_extract_all_important_links + '\n' + '\n'.join(data)
     prompt += """[END OF LINKS]"""
     return prompt
 
 
-def format_extract_structered_data(data: str) -> str:
+def format_extract_structured_data(data: str) -> str:
     prompt = PROMPT_extract_structured_Data + data
+    return prompt
+
+
+def format_extract_PDF(data: bytes) -> bytes:
+    prompt = PROMPT_extract_pdf_data.encode('utf-8')
+    prompt += '\n'.encode('utf-8') + data + '\n [END OF PDF]'.encode('utf-8')
     return prompt

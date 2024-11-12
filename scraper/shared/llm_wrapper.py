@@ -1,18 +1,18 @@
+import base64
+import json
 import os
 import re
+from typing import Optional, List, Tuple
 
-from dotenv import load_dotenv
-import json
-import base64
 import requests
-from typing import Optional, List, Union, Tuple
 from anthropic import Anthropic
+from dotenv import load_dotenv
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.text_splitter import TokenTextSplitter
 
-from shared.helpers import retry_with_backoff
-from shared.prompts import PROMPT_extract_pdf_data, format_extract_structered_data
+from shared.helpers import retry_with_backoff, extract_json
 from shared.models import Restaurant
+from shared.prompts import PROMPT_extract_pdf_data, format_extract_structured_data, format_extract_PDF
 
 load_dotenv()
 
@@ -89,32 +89,31 @@ class ClaudeWrapper(LLMWrapper):
             raise ClaudeFailureError()
 
     def extract_pdf_data(self, pdf_link: str) -> dict:
-        if pdf_link.startswith(('http://', 'https://')):
-            response = requests.get(pdf_link)
-            pdf_data = response.content
-        else:
-            with open(pdf_link, 'rb') as f:
-                pdf_data = f.read()
+        response = requests.get(pdf_link)
+        pdf_data = response.content
 
-        prompt = PROMPT_extract_pdf_data
-        response = self.make_call(prompt=prompt, file_data=pdf_data, file_type="application/pdf")
+        prompt = format_extract_PDF(pdf_data).decode("utf-8")
+        response = self.make_call(prompt=prompt)
         try:
             return json.loads(response)
         except json.JSONDecodeError:
             return {"error": "Failed to parse JSON response", "raw_response": response}
 
     def extract_structured_data(self, data: str) -> Restaurant:
-        response = self.make_call(format_extract_structered_data(data=data))
+        response = self.make_call(format_extract_structured_data(data=data))
+        with open("claude_response.json", 'w') as f:
+            f.write(response)
         try:
-            return Restaurant(**json.loads(response))
+            response = extract_json(response)
+            with open("claude_response_clean.json", 'w') as f:
+                f.write(json.dumps(response))
+            return Restaurant(**response)
         except json.JSONDecodeError:
             return {"error": "Failed to parse JSON response", "raw_response": response}
 
     def get_embeddings(self, data: str) -> List[Tuple[str, List[float]]]:
-        sentence_splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=200, paragraph_separator="\n",
-                                             tokenizer=TokenTextSplitter())
-        print(data)
-        chunks = sentence_splitter.split_text(data)
+        text_splitter = TokenTextSplitter(chunk_size=1024, chunk_overlap=200)
+        chunks = text_splitter.split_text(data)
         embeddings = []
 
         for chunk in chunks:
