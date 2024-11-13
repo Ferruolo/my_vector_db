@@ -2,6 +2,7 @@ import requests
 import time
 from typing import Tuple
 
+
 from shared.models import Location
 
 
@@ -18,7 +19,8 @@ def get_coordinates(loc: Location) -> Tuple[float, float]:
 
     try:
         time.sleep(1)
-        response = requests.get(base_url, params=params)
+        response = requests.get(base_url, params=params, headers={'User-Agent': "Certainty DB"})
+        print(response.content)
         response.raise_for_status()
         results = response.json()
 
