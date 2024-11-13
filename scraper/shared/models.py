@@ -1,5 +1,6 @@
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field, HttpUrl
+from uuid import UUID
 
 
 class DisplayName(BaseModel):
@@ -54,3 +55,14 @@ class Restaurant(BaseModel):
     menu: Menu
     locations: List[Location]
     reservations: Reservations
+
+
+class Business(BaseModel):
+    id: UUID
+    yelp_id: Optional[str] = None
+    biz_name: str
+    supports_pickup: bool
+    supports_delivery: bool
+    yelp_rating: Optional[float] = Field(None, ge=0, le=5)
+    phone_number: Optional[str] = None
+    website_url: Optional[str] = None

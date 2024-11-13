@@ -1,6 +1,6 @@
 from typing import List, Tuple, Optional, Dict
 from uuid import UUID
-
+from shared.models import Business
 from cassandra.cluster import Session
 
 
@@ -12,27 +12,38 @@ def insert_business(
         session: Session,
         item_id: UUID,
         biz_name: str,
-        yelp_id: Optional[str] = None,
+        yelp_id: str,
         supports_pickup: Optional[bool] = None,
         supports_delivery: Optional[bool] = None,
         yelp_rating: Optional[float] = None,
-        price_magnitude: Optional[int] = None,
         phone_number: Optional[str] = None,
         website_url: Optional[str] = None,
 ) -> None:
+    print(
+        f"{item_id} | {biz_name} | {yelp_id} | {supports_pickup} | {supports_delivery} | {yelp_rating}  | {phone_number} | {website_url} ")
     try:
+
+        type_validator = Business(id=str(item_id),
+                                  biz_name=biz_name,
+                                  yelp_id=yelp_id,
+                                  supports_pickup=supports_pickup,
+                                  supports_delivery=supports_delivery,
+                                  yelp_rating=yelp_rating,
+                                  phone_number=phone_number,
+                                  website_url="'" + website_url + "'")
+
         query = """
         INSERT INTO businesses (
             id, yelp_id, biz_name, supports_pickup, supports_delivery,
-            yelp_rating, price_magnitude,
-            phone_number, website_url
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            yelp_rating, phone_number, website_url
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
 
         session.execute(query, (
-            item_id, yelp_id, biz_name, supports_pickup, supports_delivery,
-            yelp_rating, price_magnitude,
-            phone_number, website_url
+            type_validator.id, type_validator.yelp_id, type_validator.biz_name,
+            type_validator.supports_pickup, type_validator.supports_delivery,
+            type_validator.yelp_rating,
+            type_validator.phone_number, type_validator.website_url
         ))
     except Exception as e:
         raise CassandraInsertionError(f"Failed to insert business record: {str(e)}")
@@ -54,7 +65,7 @@ def insert_menu_item(
         query = """
         INSERT INTO menu_data (
             item_id, business_id, item_name, item_type, item_desc, item_price
-        ) VALUES (uuid4(), ?, ?, ?, ?, ?)
+        ) VALUES (uuid4(), %s, %s, %s, %s, %s)
         """
 
         session.execute(query, (

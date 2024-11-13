@@ -1,7 +1,7 @@
 import asyncio
 import json
 import uuid
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from uuid import uuid4
 import pandas as pd
 from cassandra.cluster import Cluster, Session
@@ -23,7 +23,9 @@ index_name = "SCRAPER_IDX"
 incremental_constant = 100
 
 
-def calc_price_magnitude(dollar_signs: str) -> int:
+def calc_price_magnitude(dollar_signs: Optional[str]) -> int:
+    if dollar_signs is None:
+        return 0
     return dollar_signs.count('$')
 
 
@@ -130,32 +132,35 @@ async def main() -> None:
                 biz_id = uuid.uuid4()
                 try:
                     session.set_keyspace("restaurant_data")
+                    print(selected)
+
                     # Use try catch to add atomicity (makes it easier to keep everything straight)
                     insert_business(session, biz_id, selected['name'], selected['id'],
                                     "pickup" in selected['transactions'],
                                     "delivery" in selected['transactions'],
-                                    selected['rating'], calc_price_magnitude(selected['price']), selected['phone'], url)
+                                    selected['rating'],
+                                    selected['phone'], url)
                     put_menu_items(session, structured_data.menu, biz_id)
                     put_biz_locations(session, structured_data.locations, biz_id)
                     put_chunks(session, biz_id, text_data)
+                    print("Successfully put to CASSANDRA!!!!!")
                 except KeyboardInterrupt:
                     await scraper.stop()
-                    exit(1)
+                    raise KeyboardInterrupt
                 except Exception as e:
-                    print(f"{row['name']} failed with {e}")  # TODO: Create list of all failures in redis
+
+                    print(f"{row['name']} failed with {str(e.__class__.__name__)}{e}")  # TODO: Create list of all failures in redis
                 session.set_keyspace("restaurant_inspections")
 
             except KeyboardInterrupt:
                 print("Keyboard Interrupt detected, Goodbye!")
                 await scraper.stop()
-                await session.close()
-                exit(1)
+                raise KeyboardInterrupt
 
             except ClaudeFailureError:
                 print("Failed due to claude issues. Pay up buddy")
                 await scraper.stop()
-                await session.close()
-                exit(1)
+                raise ClaudeFailureError
 
             except Exception as e:
                 print(f"{row['item_id']} failed with error {e}")

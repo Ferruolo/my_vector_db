@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS businesses
     supports_pickup   BOOLEAN,
     supports_delivery BOOLEAN,
     yelp_rating       FLOAT,
-    price_magnitude   INT,
     phone_number      TEXT,
     website_url       TEXT,
 );
