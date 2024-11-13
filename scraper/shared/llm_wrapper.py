@@ -7,12 +7,12 @@ from typing import Optional, List, Tuple
 import requests
 from anthropic import Anthropic
 from dotenv import load_dotenv
-from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.text_splitter import TokenTextSplitter
+from sqlalchemy.dialects.postgresql import Range
 
 from shared.helpers import retry_with_backoff, extract_json
 from shared.models import Restaurant
-from shared.prompts import PROMPT_extract_pdf_data, format_extract_structured_data, format_extract_PDF
+from shared.prompts import format_extract_structured_data, format_extract_PDF
 
 load_dotenv()
 
@@ -29,8 +29,9 @@ def get_embedding(text, api_key):
     response = requests.post(
         "https://api.voyageai.com/v1/embeddings",
         headers={"Authorization": f"Bearer {api_key}"},
-        json={"model": "voyage-lite-01", "input": text}
+        json={"model": "voyage-3", "input": text}
     )
+    print(response.content)
     return response.json()["data"][0]["embedding"]
 
 
@@ -99,17 +100,20 @@ class ClaudeWrapper(LLMWrapper):
         except json.JSONDecodeError:
             return {"error": "Failed to parse JSON response", "raw_response": response}
 
-    def extract_structured_data(self, data: str) -> Restaurant:
-        response = self.make_call(format_extract_structured_data(data=data))
-        with open("claude_response.json", 'w') as f:
-            f.write(response)
-        try:
-            response = extract_json(response)
-            with open("claude_response_clean.json", 'w') as f:
-                f.write(json.dumps(response))
-            return Restaurant(**response)
-        except json.JSONDecodeError:
-            return {"error": "Failed to parse JSON response", "raw_response": response}
+    def extract_structured_data(self, data: str, max_retries = 3) -> Restaurant:
+        for i in range(max_retries):
+            response = self.make_call(format_extract_structured_data(data=data))
+
+            with open("claude_response.json", 'w') as f:
+                f.write(response)
+            try:
+                response = extract_json(response)
+                with open("claude_response_clean.json", 'w') as f:
+                    f.write(json.dumps(response))
+                return Restaurant(**response)
+            except json.JSONDecodeError:
+                print("Failed (retrying")
+        raise ClaudeFailureError()
 
     def get_embeddings(self, data: str) -> List[Tuple[str, List[float]]]:
         text_splitter = TokenTextSplitter(chunk_size=1024, chunk_overlap=200)
@@ -117,12 +121,12 @@ class ClaudeWrapper(LLMWrapper):
         embeddings = []
 
         for chunk in chunks:
-            try:
-                embed = get_embedding(chunk, api_key=self.voyage_api_key)
-                embeddings.append((chunk, embed))
-            except Exception as e:
-                print(f"Error generating embedding: {str(e)}")
-                continue
+            # try:
+            embed = get_embedding(chunk, api_key=self.voyage_api_key)
+            embeddings.append((chunk, embed))
+            # except Exception as e:
+            #     print(f"Error generating embedding: {str(e)}")
+            #     continue
         return embeddings
 
 

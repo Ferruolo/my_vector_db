@@ -32,7 +32,7 @@ def insert_business(
         session.execute(query, (
             item_id, yelp_id, biz_name, supports_pickup, supports_delivery,
             yelp_rating, price_magnitude,
-            phone_number, website_url,
+            phone_number, website_url
         ))
     except Exception as e:
         raise CassandraInsertionError(f"Failed to insert business record: {str(e)}")

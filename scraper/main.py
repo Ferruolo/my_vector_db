@@ -114,12 +114,16 @@ async def main() -> None:
                         print(f"Fetching {link}")
                         all_text += (await scrape_all_text(link, scraper)) + '\n'
 
+                all_text += '\n'.join(links)
+
                 all_text = drop_repeated_newline_regex(all_text)
                 all_text = strip_white_space(all_text)
                 all_text = drop_duplicate_sentences(all_text)
                 with open('data/example.txt', 'w') as f:
                     f.write(all_text)
                 structured_data = claude.extract_structured_data(all_text)
+
+
 
                 text_data = claude.get_embeddings(all_text)
 
