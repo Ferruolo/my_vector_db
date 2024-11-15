@@ -20,7 +20,7 @@ class Menu(BaseModel):
 
 
 class Location(BaseModel):
-    building_number: Optional[str] = None
+    building_number: Optional[int] = None
     room_number: Optional[str] = None
     street: str
     city: str = "New York"
@@ -34,7 +34,7 @@ class ReservationRestriction(BaseModel):
 
 class ReservationPlatform(BaseModel):
     type: Literal["RESY", "OPENTABLE", "TOCK", "YELP", "DIRECT", "OTHER"]
-    url: HttpUrl
+    url: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -49,7 +49,6 @@ class Reservations(BaseModel):
         description="General reservation policy (e.g., 'Walk-ins only', 'Large parties only')"
     )
     restrictions: Optional[List[ReservationRestriction]] = None
-
 
 class Restaurant(BaseModel):
     menu: Menu

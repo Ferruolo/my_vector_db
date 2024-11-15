@@ -78,8 +78,8 @@ Response Schema:
     },
     "locations": [
         {
-            "building_number": string,   // Building number as string to handle complex numbers (e.g. "123-125")
-            "room_number": string | null, // Room number as string, null when not applicable
+            "building_number": int | null,   // Building number as string to handle complex numbers (e.g. "123-125")
+            "room_number": int | null, // Room number as string, null when not applicable
             "street": string,
             "city": string,             // Default: "New York", required field
             "state": string             // Default: "New York", required field

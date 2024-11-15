@@ -1,5 +1,5 @@
 from typing import List, Tuple, Optional, Dict
-from uuid import UUID
+from uuid import UUID, uuid4
 from shared.models import Business
 from cassandra.cluster import Session
 
@@ -54,7 +54,7 @@ def insert_menu_item(
         business_id: UUID,
         item_name: str,
         item_type: str,
-        item_price: str,
+        item_price: float,
         item_desc: Optional[str] = None
 ) -> None:
     valid_types = {'STARTER', 'MAIN', 'DESSERT', 'DRINK', 'BOTTLE', 'SIDE'}
@@ -65,11 +65,11 @@ def insert_menu_item(
         query = """
         INSERT INTO menu_data (
             item_id, business_id, item_name, item_type, item_desc, item_price
-        ) VALUES (uuid4(), %s, %s, %s, %s, %s)
+        ) VALUES (%s, %s, %s, %s, %s, %s)
         """
 
         session.execute(query, (
-            business_id, item_name, item_type, item_desc, item_price
+            uuid4(), business_id, item_name, item_type, item_desc, item_price
         ))
     except Exception as e:
         raise CassandraInsertionError(f"Failed to insert menu item: {str(e)}")
@@ -82,17 +82,17 @@ def insert_text_data(
         embedding: List[float]
 ) -> None:
     if len(embedding) != 4096:
-        raise ValueError("Embedding must be 4096 dimensions")
+        raise ValueError(f"Embedding must be 4096 dimensions, got {len(embedding)}")
 
     try:
         query = """
         INSERT INTO text_data (
             entry_id, business_id, text_selection, embedding
-        ) VALUES (uuid4(), ?, ?, ?)
+        ) VALUES (%s, %s, %s, %s)
         """
 
         session.execute(query, (
-            business_id, text_selection, embedding
+            uuid4(), business_id, text_selection, embedding
         ))
     except Exception as e:
         raise CassandraInsertionError(f"Failed to insert text data: {str(e)}")
@@ -115,11 +115,11 @@ def insert_opening_hours(
         query = """
         INSERT INTO opening_data (
             entry_id, business_id, open_time, close_time, day_of_week
-        ) VALUES (uuid4(), ?, ?, ?, ?)
+        ) VALUES (%s, %s, %s, %s, %s)
         """
 
         session.execute(query, (
-            business_id, open_time, close_time, day_of_week
+            uuid4(), business_id, open_time, close_time, day_of_week
         ))
     except Exception as e:
         raise CassandraInsertionError(f"Failed to insert opening hours: {str(e)}")
@@ -135,7 +135,7 @@ def insert_location(
         query = """
         INSERT INTO locations (
             location_id, location_name, boundaries
-        ) VALUES (?, ?, ?)
+        ) VALUES (%s, %s, %s)
         """
 
         session.execute(query, (
@@ -158,11 +158,11 @@ def insert_location_data(
         query = """
         INSERT INTO location_data (
             entry_id, location_id, data, embedding
-        ) VALUES (uuid4(), ?, ?, ?)
+        ) VALUES (?, ?, ?, ?)
         """
 
         session.execute(query, (
-            location_id, data, embedding
+            uuid4(), location_id, data, embedding
         ))
     except Exception as e:
         raise CassandraInsertionError(f"Failed to insert location data: {str(e)}")
@@ -182,7 +182,7 @@ def insert_business_location(
 ) -> None:
     query = """
         INSERT INTO biz_locations 
-        (location_id, biz_id, latitude, longitude, building_number, roomNumber, street, city, state)
+        (location_id, biz_id, latitude, longitude, building_number, room_number, street, city, state)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
 
@@ -204,7 +204,7 @@ def insert_reservation_data(session: Session, business_id: str, reservation_data
                 business_id,
                 accepts_reservations,
                 reservation_policy
-            ) VALUES (?, ?, ?)
+            ) VALUES (%s, %s, %s)
         """
         session.execute(
             basic_info_query,
@@ -222,7 +222,7 @@ def insert_reservation_data(session: Session, business_id: str, reservation_data
                     platform_type,
                     url,
                     notes
-                ) VALUES (?, ?, ?, ?)
+                ) VALUES (%s, %s, %s, %s)
             """
             for platform in reservation_data["platforms"]:
                 session.execute(
@@ -241,7 +241,7 @@ def insert_reservation_data(session: Session, business_id: str, reservation_data
                     business_id,
                     restriction_type,
                     restriction_details
-                ) VALUES (?, ?, ?)
+                ) VALUES (%s, %s, %s)
             """
             for restriction in reservation_data["restrictions"]:
                 session.execute(

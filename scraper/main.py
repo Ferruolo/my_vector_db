@@ -31,7 +31,7 @@ def calc_price_magnitude(dollar_signs: Optional[str]) -> int:
 
 def put_menu_items(session, menu: Menu, biz_id):
     for item in menu.items:
-        insert_menu_item(session, biz_id, item.name, item.type, item.price, item.description)
+        insert_menu_item(session, biz_id, item.name, item.type, item.price, item.desc)
 
 
 def put_biz_locations(session, locations: List[Location], biz_id):
@@ -125,8 +125,6 @@ async def main() -> None:
                     f.write(all_text)
                 structured_data = claude.extract_structured_data(all_text)
 
-
-
                 text_data = claude.get_embeddings(all_text)
 
                 biz_id = uuid.uuid4()
@@ -148,8 +146,8 @@ async def main() -> None:
                     await scraper.stop()
                     raise KeyboardInterrupt
                 except Exception as e:
-
-                    print(f"{row['name']} failed with {str(e.__class__.__name__)}{e}")  # TODO: Create list of all failures in redis
+                    print(
+                        f"{row['name']} failed with {str(e.__class__.__name__)}{e}")  # TODO: Create list of all failures in redis
                 session.set_keyspace("restaurant_inspections")
 
             except KeyboardInterrupt:
@@ -164,6 +162,8 @@ async def main() -> None:
 
             except Exception as e:
                 print(f"{row['item_id']} failed with error {e}")
+
+
     await scraper.stop()
     await session.close()
 

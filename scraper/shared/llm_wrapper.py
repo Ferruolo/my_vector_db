@@ -20,6 +20,7 @@ load_dotenv()
 class ClaudeFailureError(Exception):
     pass
 
+
 def _get_media_type(image_path: str) -> str:
     extension = re.search(r'\.(\w+)$', image_path).group(1).lower()
     return f"{extension}"
@@ -31,7 +32,6 @@ def get_embedding(text, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
         json={"model": "voyage-3", "input": text}
     )
-    print(response.content)
     return response.json()["data"][0]["embedding"]
 
 
@@ -100,7 +100,7 @@ class ClaudeWrapper(LLMWrapper):
         except json.JSONDecodeError:
             return {"error": "Failed to parse JSON response", "raw_response": response}
 
-    def extract_structured_data(self, data: str, max_retries = 3) -> Restaurant:
+    def extract_structured_data(self, data: str, max_retries=3) -> Restaurant:
         for i in range(max_retries):
             response = self.make_call(format_extract_structured_data(data=data))
 
