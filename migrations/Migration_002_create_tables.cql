@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS text_data
     entry_id       UUID PRIMARY KEY,
     business_id    UUID,
     text_selection TEXT,
-    embedding      vector<float, 4096>
+    embedding      vector<float, 1024>
 );
 
 
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS location_data
     entry_id    UUID,
     location_id UUID,
     data        text,
-    embedding   vector<float, 4096>,
+    embedding   vector<float, 1024>,
     PRIMARY KEY (entry_id, location_id)
 );
 

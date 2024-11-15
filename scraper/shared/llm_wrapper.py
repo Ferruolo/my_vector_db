@@ -8,7 +8,6 @@ import requests
 from anthropic import Anthropic
 from dotenv import load_dotenv
 from llama_index.core.text_splitter import TokenTextSplitter
-from sqlalchemy.dialects.postgresql import Range
 
 from shared.helpers import retry_with_backoff, extract_json
 from shared.models import Restaurant

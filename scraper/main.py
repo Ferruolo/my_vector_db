@@ -163,7 +163,6 @@ async def main() -> None:
             except Exception as e:
                 print(f"{row['item_id']} failed with error {e}")
 
-
     await scraper.stop()
     await session.close()
 

@@ -81,8 +81,8 @@ def insert_text_data(
         text_selection: str,
         embedding: List[float]
 ) -> None:
-    if len(embedding) != 4096:
-        raise ValueError(f"Embedding must be 4096 dimensions, got {len(embedding)}")
+    if len(embedding) != 1024:
+        raise ValueError(f"Embedding must be 1024 dimensions, got {len(embedding)}")
 
     try:
         query = """
@@ -151,8 +151,8 @@ def insert_location_data(
         data: str,
         embedding: List[float]
 ) -> None:
-    if len(embedding) != 4096:
-        raise ValueError("Embedding must be 4096 dimensions")
+    if len(embedding) != 1024:
+        raise ValueError("Embedding must be 1024 dimensions")
 
     try:
         query = """
