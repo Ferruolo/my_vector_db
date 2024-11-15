@@ -1,5 +1,4 @@
 import asyncio
-import json
 import uuid
 from typing import List, Tuple, Optional
 from uuid import uuid4
@@ -47,7 +46,6 @@ def put_chunks(session: Session, biz_id, embeddings: List[Tuple[str, List[float]
 
 
 async def main() -> None:
-    # llama = LlamafileWrapper()
     claude = ClaudeWrapper()
     redis = create_redis_client()
     (put_item, delete_item, fetch_item) = create_channel_interface(redis, channel=0)
@@ -88,24 +86,19 @@ async def main() -> None:
             try:
                 if row['name'] is None:
                     raise Exception("Name is Undefined")
-                print(f"Fetching data for Company {row['name']}")
+                print(f"Fetching data for company {row['name']}")
                 # try:
                 biz_data = yelp.get_website_from_coords(row['name'], row['latitude'], row['longitude'])
                 if len(biz_data['businesses']) == 0:
                     raise Exception("Yelp Data Not Found")
 
                 selected = biz_data['businesses'][0]
-                with open("yelp_api.json", 'w') as f:
-                    f.write(json.dumps(biz_data))
                 # Get all links
                 url = await yelp.extract_url(selected, scraper)
                 print("Successfully fetched yelp url")
                 await scraper.goto(url)
                 links = await scraper.get_all_links()
-                print(links)
-                print("Drop Number of Links")
                 response = claude.make_call(format_extract_all_important_links(links))
-                print(f"Formatted Links: \n {response}")
                 links = extract_json(response)['links']
 
                 all_text = ""
@@ -143,7 +136,6 @@ async def main() -> None:
                     put_chunks(session, biz_id, text_data)
                     print("Successfully put to CASSANDRA!!!!!")
                 except KeyboardInterrupt:
-                    await scraper.stop()
                     raise KeyboardInterrupt
                 except Exception as e:
                     print(
@@ -153,12 +145,11 @@ async def main() -> None:
             except KeyboardInterrupt:
                 print("Keyboard Interrupt detected, Goodbye!")
                 await scraper.stop()
-                raise KeyboardInterrupt
-
+                raise KeyboardInterrupt()
             except ClaudeFailureError:
                 print("Failed due to claude issues. Pay up buddy")
                 await scraper.stop()
-                raise ClaudeFailureError
+                raise ClaudeFailureError()
 
             except Exception as e:
                 print(f"{row['item_id']} failed with error {e}")
@@ -169,10 +160,10 @@ async def main() -> None:
 
 if __name__ == "__main__":
     loop = asyncio.new_event_loop()
-    try:
-        asyncio.set_event_loop(loop)
-        # Run the main function
-        loop.run_until_complete(main())
-    finally:
-        # Clean up
-        loop.close()
+    # try:
+    asyncio.set_event_loop(loop)
+    # Run the main function
+    loop.run_until_complete(main())
+    # finally:
+    #     # Clean up
+    #     loop.close()

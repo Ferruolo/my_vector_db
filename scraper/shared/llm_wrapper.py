@@ -152,22 +152,4 @@ class LlavaWrapper(LLMWrapper):
         result = response.json()
         return result
 
-# class LlamafileWrapper:
-#     def __init__(self, base_url: str = "http://localhost:8080"):
-#         self.base_url = base_url.rstrip('/')
-#
-#     def completion(self, prompt: str) -> str:
-#         payload = {"prompt": prompt, "stream": False, "temperature": 0.7, "top_p": 0.9, "max_tokens": 4096}
-#
-#         response = requests.post(f"{self.base_url}/completion", json=payload)
-#         response.raise_for_status()
-#         return json_response
-#
-#     def embedding(self, text: Union[str, List[str]], dims: int = 4096) -> Union[List[float], List[List[float]]]:
-#         if isinstance(text, str):
-#             payload = {"text": text, "dims": dims}
-#             response = requests.post(f"{self.base_url}/embedding", json=payload)
-#             response.raise_for_status()
-#             return response.json()["embedding"]
-#         else:
-#             return [self.embedding(t, dims) for t in text]
+
