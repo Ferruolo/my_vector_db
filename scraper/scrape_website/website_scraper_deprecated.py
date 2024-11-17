@@ -9,7 +9,7 @@ import requests
 from PIL import Image
 from bs4 import BeautifulSoup
 
-from scrape_website.webscraper import Puppeteer
+from scrape_website.webscraper import Playwright
 from shared.bloomfilter import BloomFilter
 from shared.helpers import extract_base_url, drop_repeated_newline_regex, is_internal_link, is_toast_tab_link
 from shared.unique_search_container import UniqueSearchContainer
@@ -83,7 +83,7 @@ def is_pdf_link(url: str) -> bool:
     return url.lower().endswith('.pdf')
 
 
-async def scrape_all_text(url: str, scraper: Puppeteer):
+async def scrape_all_text(url: str, scraper: Playwright):
     try:
         await scraper.goto(url)
         soup = await scraper.get_page_soup()

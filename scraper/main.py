@@ -5,7 +5,7 @@ from uuid import uuid4
 import pandas as pd
 from cassandra.cluster import Cluster, Session
 
-from scrape_website.webscraper import Puppeteer
+from scrape_website.webscraper import Playwright
 from scrape_website.website_scraper_deprecated import is_pdf_link, scrape_all_text
 from scrape_website.yelp_interface import YelpInterface
 
@@ -60,7 +60,7 @@ async def main() -> None:
     """.format(table_name))
 
     prepped_count_call = session.prepare("""SELECT count(*) as COUNT FROM {}""".format(table_name))
-    scraper = Puppeteer(headless=False)
+    scraper = Playwright(headless=False)
 
     if not fetch_item(index_name):
         put_item(index_name, 0)

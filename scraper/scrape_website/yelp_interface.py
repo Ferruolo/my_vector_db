@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import os
 import re
 
-from scrape_website.webscraper import Puppeteer
+from scrape_website.webscraper import Playwright
 
 load_dotenv()
 
@@ -36,7 +36,7 @@ class YelpInterface:
                                 headers=self.headers)
         return response.json()
 
-    async def extract_url(self, yelp_response: dict, scraper: Puppeteer):
+    async def extract_url(self, yelp_response: dict, scraper: Playwright):
         yelp_url = yelp_response['url']
         await scraper.goto(yelp_url)
         print("Grabbing URL from yelp")

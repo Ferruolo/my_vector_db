@@ -1,114 +1,199 @@
 from typing import Optional, Dict, List, Any
 from bs4 import BeautifulSoup
-from pyppeteer import launch
-from pyppeteer_stealth import stealth
+from playwright.async_api import async_playwright, Browser, Page, TimeoutError
+from contextlib import asynccontextmanager
+import logging
 
-
-class Puppeteer:
+class Playwright:
     def __init__(self, headless: bool = True, user_agent: Optional[str] = None):
-        self.browser = None
-        self.page = None
+        self.browser: Optional[Browser] = None
+        self.page: Optional[Page] = None
         self.headless = headless
-        # self.user_agent = user_agent or 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        self.user_agent = user_agent
+        self.logger = logging.getLogger(__name__)
+        self.playwright = None
+
+    async def __aenter__(self):
+        await self.start()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.stop()
 
     async def start(self):
-        self.browser = await launch(headless=self.headless)
-        self.page = await self.browser.newPage()
-        self.page.setDefaultNavigationTimeout(0)
-        await stealth(self.page)  # Use the async stealth function
+        try:
+            self.playwright = await async_playwright().start()
+            self.browser = await self.playwright.chromium.launch(
+                headless=self.headless,
+                args=['--no-sandbox', '--disable-setuid-sandbox']
+            )
+            self.page = await self.browser.new_page()
+            if self.user_agent:
+                await self.page.set_extra_http_headers({"User-Agent": self.user_agent})
+            # No need to set default timeout as Playwright handles this differently
+            # No need for stealth as Playwright has better built-in evasion
+        except Exception as e:
+            self.logger.error(f"Failed to start browser: {str(e)}")
+            if self.browser:
+                await self.browser.close()
+            if self.playwright:
+                await self.playwright.stop()
+            raise
 
     async def stop(self):
-        if self.browser:
-            await self.browser.close()
+        try:
+            if self.page:
+                await self.page.close()
+            if self.browser:
+                await self.browser.close()
+            if self.playwright:
+                await self.playwright.stop()
+        except Exception as e:
+            self.logger.error(f"Error during cleanup: {str(e)}")
+            raise
 
-    async def goto(self, url: str, wait_until: str = 'domcontentloaded'):
+    async def _ensure_page(self):
         if not self.page:
             await self.start()
-        await self.page.goto(url, {'waitUntil': wait_until})
+
+    async def goto(self, url: str, wait_until: str = 'domcontentloaded'):
+        try:
+            await self._ensure_page()
+            # Convert Puppeteer's wait_until to Playwright's wait_until
+            wait_until_map = {
+                'domcontentloaded': 'domcontentloaded',
+                'load': 'load',
+                'networkidle0': 'networkidle',
+                'networkidle2': 'networkidle'
+            }
+            playwright_wait_until = wait_until_map.get(wait_until, 'domcontentloaded')
+            await self.page.goto(url, wait_until=playwright_wait_until)
+        except TimeoutError as e:
+            self.logger.warning(f"Navigation timeout for URL: {url}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Failed to navigate to {url}: {str(e)}")
+            raise
 
     async def get_text(self, selector: str) -> str:
-        element = await self.page.querySelector(selector)
-        if element:
-            return await self.page.evaluate('(element) => element.textContent', element)
-        return ''
+        try:
+            await self._ensure_page()
+            element = await self.page.query_selector(selector)
+            if element:
+                return await element.text_content() or ''
+            return ''
+        except Exception as e:
+            self.logger.error(f"Error getting text for selector {selector}: {str(e)}")
+            raise
 
     async def get_texts(self, selector: str) -> List[str]:
-        elements = await self.page.querySelectorAll(selector)
-        texts = []
-        for element in elements:
-            text = await self.page.evaluate('(element) => element.textContent', element)
-            texts.append(text)
-        return texts
+        try:
+            await self._ensure_page()
+            elements = await self.page.query_selector_all(selector)
+            return [await element.text_content() or '' for element in elements]
+        except Exception as e:
+            self.logger.error(f"Error getting texts for selector {selector}: {str(e)}")
+            raise
 
     async def click(self, selector: str):
-        await self.page.click(selector)
+        try:
+            await self._ensure_page()
+            await self.page.click(selector)
+        except Exception as e:
+            self.logger.error(f"Error clicking selector {selector}: {str(e)}")
+            raise
 
     async def type(self, selector: str, text: str):
-        await self.page.type(selector, text)
+        try:
+            await self._ensure_page()
+            await self.page.type(selector, text)
+        except Exception as e:
+            self.logger.error(f"Error typing into selector {selector}: {str(e)}")
+            raise
 
     async def wait_for_selector(self, selector: str, timeout: int = 30000):
-        await self.page.waitForSelector(selector, {'timeout': timeout})
+        try:
+            await self._ensure_page()
+            await self.page.wait_for_selector(selector, timeout=timeout)
+        except TimeoutError as e:
+            self.logger.warning(f"Timeout waiting for selector: {selector}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Error waiting for selector {selector}: {str(e)}")
+            raise
 
     async def screenshot(self, path: str):
-        await self.page.screenshot({'path': path})
+        try:
+            await self._ensure_page()
+            await self.page.screenshot(path=path)
+        except Exception as e:
+            self.logger.error(f"Error taking screenshot: {str(e)}")
+            raise
 
     async def get_cookies(self) -> List[Dict[str, Any]]:
-        return await self.page.cookies()
+        try:
+            await self._ensure_page()
+            return await self.page.context.cookies()
+        except Exception as e:
+            self.logger.error(f"Error getting cookies: {str(e)}")
+            raise
 
     async def set_cookies(self, cookies: List[Dict[str, Any]]):
-        await self.page.setCookie(*cookies)
+        try:
+            await self._ensure_page()
+            await self.page.context.add_cookies(cookies)
+        except Exception as e:
+            self.logger.error(f"Error setting cookies: {str(e)}")
+            raise
 
     async def evaluate(self, js_code: str):
-        return await self.page.evaluate(js_code)
+        try:
+            await self._ensure_page()
+            return await self.page.evaluate(js_code)
+        except Exception as e:
+            self.logger.error(f"Error evaluating JavaScript: {str(e)}")
+            raise
 
     async def get_all_links(self) -> List[str]:
-        links = await self.page.evaluate('''
-            () => {
-                return Array.from(document.getElementsByTagName('a')).map(link => ({
-                    href: link.href,
-                    text: link.textContent.trim(),
-                    title: link.title || '',
-                    rel: link.rel || '',
-                    isVisible: 
-                        window.getComputedStyle(link).display !== 'none' &&
-                        window.getComputedStyle(link).visibility !== 'hidden' &&
-                        link.offsetParent !== null
-                }));
-            }
-        ''')
-        links = [link['href'] for link in links]
-        return links
+        try:
+            await self._ensure_page()
+            links = await self.page.evaluate('''
+                () => {
+                    return Array.from(document.getElementsByTagName('a')).map(link => ({
+                        href: link.href,
+                        text: link.textContent.trim(),
+                        title: link.title || '',
+                        rel: link.rel || '',
+                        isVisible: 
+                            window.getComputedStyle(link).display !== 'none' &&
+                            window.getComputedStyle(link).visibility !== 'hidden' &&
+                            link.offsetParent !== null
+                    }));
+                }
+            ''')
+            return [link['href'] for link in links]
+        except Exception as e:
+            self.logger.error(f"Error getting all links: {str(e)}")
+            raise
 
     async def get_all_images(self) -> List[str]:
-        images = await self.page.evaluate('''
-            () => Array.from(document.getElementsByTagName('img')).map(img => ({
-                src: img.src
-            }))
-        ''')
-
-        # Filter out data URLs and empty sources
-        return [img['src'] for img in images if img['src'] and not img['src'].startswith('data:')]
+        try:
+            await self._ensure_page()
+            images = await self.page.evaluate('''
+                () => Array.from(document.getElementsByTagName('img')).map(img => ({
+                    src: img.src
+                }))
+            ''')
+            return [img['src'] for img in images if img['src'] and not img['src'].startswith('data:')]
+        except Exception as e:
+            self.logger.error(f"Error getting all images: {str(e)}")
+            raise
 
     async def get_page_soup(self) -> BeautifulSoup:
-        content = await self.page.content()
-        soup = BeautifulSoup(content, 'html.parser')
-        return soup
-
-
-#
-# async def main():
-#     scraper = Puppeteer(headless=False)
-#     try:
-#         await scraper.start()
-#         await scraper.goto('https://www.nytimes.com/')
-#         print(await scraper.get_full_page_text())
-#         print("complete")
-#         await scraper.stop()
-#     except Exception as e:
-#         await scraper.stop()
-#         print(f"Failed with error {e}")
-#         exit(1)
-#
-#
-# if __name__ == '__main__':
-#     asyncio.run(main())
+        try:
+            await self._ensure_page()
+            content = await self.page.content()
+            return BeautifulSoup(content, 'html.parser')
+        except Exception as e:
+            self.logger.error(f"Error getting page soup: {str(e)}")
+            raise
